@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from time import sleep
 
 from edap.bindings import read_bindings
 from edap.config import AppConfig
+from edap.platform.input.factory import build_input_controller
 from edap.platform.paths.factory import build_game_paths
 from edap.platform.screen.factory import build_screen_capture
 from edap.state import get_latest_journal_log, read_ship_state
@@ -13,6 +15,12 @@ from edap.state import get_latest_journal_log, read_ship_state
 @dataclass(frozen=True)
 class DiagnosticsOptions:
     capture_screen: bool = False
+    send_test_key: bool = False
+    test_key: str = "space"
+    test_modifier: str | None = None
+    hold_s: float = 0.0
+    delay_s: float = 0.0
+    repeat: int = 1
 
 
 def _path_status(path: Path | None) -> str:
@@ -68,6 +76,9 @@ def run_diagnostics(config: AppConfig, options: DiagnosticsOptions) -> dict[str,
     if options.capture_screen:
         result["screen_capture"] = run_screen_capture_diagnostic(config)
 
+    if options.send_test_key:
+        result["input_test"] = run_input_diagnostic(config, options)
+
     return result
 
 
@@ -92,4 +103,35 @@ def run_screen_capture_diagnostic(config: AppConfig) -> dict[str, object]:
         "width": getattr(image, "width", width),
         "height": getattr(image, "height", height),
         "saved_path": saved_path,
+    }
+
+
+def run_input_diagnostic(config: AppConfig, options: DiagnosticsOptions) -> dict[str, object]:
+    try:
+        input_controller = build_input_controller(config.runtime.platform)
+    except Exception as exc:
+        return {"status": "error", "error": str(exc)}
+
+    if input_controller is None:
+        return {"status": "unsupported"}
+
+    try:
+        if options.delay_s > 0:
+            sleep(options.delay_s)
+        for _ in range(max(1, options.repeat)):
+            input_controller.tap_key(
+                options.test_key,
+                modifier=options.test_modifier,
+                hold_s=options.hold_s,
+            )
+    except Exception as exc:
+        return {"status": "error", "error": str(exc)}
+
+    return {
+        "status": "ok",
+        "test_key": options.test_key,
+        "test_modifier": options.test_modifier,
+        "hold_s": options.hold_s,
+        "delay_s": options.delay_s,
+        "repeat": options.repeat,
     }

@@ -20,6 +20,39 @@ def main() -> int:
         action="store_true",
         help="Capture a full-screen debug image using the configured resolution and scale",
     )
+    parser.add_argument(
+        "--send-test-key",
+        action="store_true",
+        help="Send a synthetic test key through the active input backend",
+    )
+    parser.add_argument(
+        "--test-key",
+        default="space",
+        help="Key to send when --send-test-key is used",
+    )
+    parser.add_argument(
+        "--test-modifier",
+        default=None,
+        help="Optional modifier to hold while sending the test key",
+    )
+    parser.add_argument(
+        "--hold-seconds",
+        type=float,
+        default=0.0,
+        help="Optional hold duration for the test key",
+    )
+    parser.add_argument(
+        "--delay-seconds",
+        type=float,
+        default=0.0,
+        help="Delay before sending the test key so you can focus the game window",
+    )
+    parser.add_argument(
+        "--repeat",
+        type=int,
+        default=1,
+        help="Number of times to send the test key",
+    )
     args = parser.parse_args()
 
     config_path = args.config
@@ -39,6 +72,12 @@ def main() -> int:
             return 2
     options = DiagnosticsOptions(
         capture_screen=args.capture_screen,
+        send_test_key=args.send_test_key,
+        test_key=args.test_key,
+        test_modifier=args.test_modifier,
+        hold_s=args.hold_seconds,
+        delay_s=args.delay_seconds,
+        repeat=args.repeat,
     )
     result = run_diagnostics(config, options)
     result["config_path"] = config_path
