@@ -1,104 +1,119 @@
-# Elite Dangerous: AutoPilot v2
-Elite Dangerous computer vision based autopilot version 2
+# EDAutopilot
 
-Program uses openCV and other tools in python to navigate automatically in Elite Dangerous.
+Elite Dangerous autopilot experimentation using computer vision, journal parsing, and synthetic keyboard input.
 
-Look [here for the autopilot alpha version release](https://github.com/skai2/EDAutopilot/releases).
+## Project Direction
 
-# Warning:
-The .exe file avalable on the release page is broken on many systems.\
-Feel free to try it however if you get a popup saying `Failed to execute` then you will need to run from the source code untill the restructure is finished and a new .exe is created.
+This repository started as a Windows-focused prototype. The current direction is different:
 
-## Usage:
-The program will create an icon on the taskbar.
+- primary target: macOS
+- game runtime: Elite Dangerous through CrossOver
+- design constraint: keep future Windows compatibility in mind
+- immediate goal: prove the platform/runtime plumbing before expanding autopilot behavior
 
-  1. Setup a route in the galaxy map as you would normally, then:
-  
-  - Optionally right click the taskbar icon to set which fire group (primary or secondary) you have configured your discovery scanner to, to enable auto-scanner (remember you must have a *keyboard*, not mouse, binding as well)
+That means the next milestone is not a feature rewrite. It is a portability and diagnostics milestone.
 
-  2. Press **Home** key to start autopilot.
+## Current Plan
 
-  3. Press **End** key to abort autopilot.  
+The active plan is documented in [docs/plans/0001-macos-mvp-portability-plan.md](docs/plans/0001-macos-mvp-portability-plan.md).
 
-## Necessary Setup:
-In game, you must have configured keyboard keys for all of the following. You may configure them in either
-the left or the right slot, and this program will automatically fetch your most recent changes.
-  * In 'Mouse Control':
-    * Reset Mouse
-  * In 'Flight Rotation':
-    * Yaw Left
-    * Yaw Right
-    * Roll Left
-    * Roll Right
-    * Pitch Up
-    * Pitch Down
-  * In 'Flight Throttle':
-    * Set Speed To 0%
-    * Set Speed To 100%
-  * In 'Flight Miscellaneous'
-    * Toggle Frameshift Drive
-  * In 'Mode Switches':
-    * UI Focus
-  * In 'Interface Mode':
-    * UI Panel Up
-    * UI Panel Down
-    * UI Panel Left
-    * UI Panel Right
-    * UI Panel Select
-    * UI Back
-    * Next Panel Tab
-  * In 'Headlook Mode':
-    * Reset Headlook
+In short, the next implementation target is a macOS diagnostic runner that proves:
 
-## Optimal Game Settings:
-1. Game resolution:      1080p Borderless
-2. Ship UI color:        Orange (default colour)
-3. Ship UI brightness:   Maximum
+- journal access from a configured path
+- bindings access from a configured path
+- screen capture from the visible game on macOS
+- synthetic keyboard input into the CrossOver Elite Dangerous window
 
-## General Guidelines
+Only after those work reliably should the full autopilot loop be reconnected.
 
-I recommend setting your route finder to use only scoopable stars. For full functionality, "Advanced Autodocking" module must be outfitted on ship. Definitely do not leave this running unsupervised unless you don't mind paying rebuy.
+## What `diagnostics.py` Is
 
-##
-Or if you'd like to set it up and run the script directly...
+`diagnostics.py` is the diagnostic runner entry point.
 
-## Setup:
-_Requires **python 3** and **git**_
-1. Clone this repository
+It is a small command or mode that validates core prerequisites without attempting to fly the ship. For this project, that means checking config, journal parsing, bindings parsing, screen capture, and test input delivery.
+
+## Current State
+
+The existing codebase still contains the original Windows-oriented implementation:
+
+- `autopilot.py` starts the legacy app flow
+- `dev_tray.py` contains tray and hotkey behavior
+- `dev_autopilot.py` contains most of the current logic
+- `src/directinput.py` is Windows-specific input code
+
+That code is useful as a behavior reference, but it should not be treated as the final structure for the macOS-first version.
+
+## Near-Term Goals
+
+- introduce explicit config for paths and hotkeys
+- extract journal and bindings parsing into reusable modules
+- isolate platform-specific input, paths, hotkeys, and screen capture
+- build the macOS diagnostic runner
+- reconnect autopilot logic only after diagnostics are stable
+
+## Diagnostics Usage
+
+Copy `config.example.toml` to `config.toml` and fill in the journal and bindings locations if auto-detection is not sufficient.
+
+Then run:
+
 ```sh
-> git clone https://github.com/skai2/EDAutopilot.git
-```
-2. Install requirements
-```sh
-> cd EDAutoPilot
-> pip install -r requirements.txt
-```
-3. Run script
-```sh
-> python autopilot.py
-OR you may have to run
-> python3 autopilot.py
-if you have both python 2 and 3 installed.
+python3 diagnostics.py --config config.toml
 ```
 
-If you encounter any issues during pip install, try running:
-> python -m pip install -r requirements.txt
-instead of > pip install -r requirements.txt
+Optional checks:
 
-## WARNING:
+```sh
+python3 diagnostics.py --config config.toml --capture-screen
+python3 diagnostics.py --config config.toml --send-test-key --test-key j
+python3 diagnostics.py --config config.toml --send-test-key --test-key j --delay-seconds 5 --repeat 3
+```
 
-ALPHA VERSION IN DEVELOPMENT. 
+Current behavior:
 
-Absolutely DO NOT LEAVE UNSUPERVISED. 
+- journal and bindings diagnostics are implemented
+- macOS path fallback discovery is implemented
+- screen capture diagnostic can save a debug image
+- macOS test input is wired through a native `osascript` backend for validation
 
-Use at YOUR OWN RISK.
+On macOS, synthetic input and screen capture may require Accessibility or Screen Recording permissions depending on system settings.
 
-## CONTACT:
+## Configuration Direction
 
-# Email
+The project is moving away from hardcoded assumptions such as:
 
-skai2mail@gmail.com
+- Windows journal locations
+- Windows bindings locations
+- fixed start/stop shortcuts
 
-# Discord
+Planned configurable items include:
 
-https://discord.gg/HCgkfSc
+- journal directory
+- bindings file
+- start hotkey
+- stop hotkey
+- scanner mode
+- screen/capture scaling values
+
+## Existing Runtime Assumptions
+
+The legacy computer vision code was built around:
+
+- 1080p-style capture assumptions
+- default orange Elite UI colors
+- a visible game window
+
+Those assumptions may need adjustment on macOS because of Retina scaling and CrossOver window behavior, but the vision logic itself is not the first thing to rewrite.
+
+## Development
+
+This project is still experimental. Do not leave it running unattended.
+
+For commits, use Conventional Commits.
+
+Examples:
+
+- `feat: add config loader`
+- `refactor: split platform adapters from autopilot logic`
+- `docs: update macos roadmap`
+- `fix: validate missing journal path`
