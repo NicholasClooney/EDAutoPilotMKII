@@ -1,0 +1,18 @@
+[paths]
+journal_dir = ""
+bindings_file = ""
+
+[controls]
+start_hotkey = "home"
+stop_hotkey = "end"
+scanner_mode = "off"
+
+[screen]
+resolution_width = 1920
+resolution_height = 1080
+scale = 1.0
+capture_debug_path = "artifacts/diagnostics-screen.png"
+
+[runtime]
+platform = "macos"
+debug = true
