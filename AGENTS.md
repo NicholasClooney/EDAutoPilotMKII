@@ -41,6 +41,7 @@ When work is delegated to agents:
 - prefer concrete implementation or verification slices over broad analysis
 - require the agent to verify its own work locally when practical
 - require the agent to report changed files, what works, what remains unresolved, and key assumptions
+- when two or more slices are genuinely independent and could run concurrently (different files, different concerns, no shared decisions), call that out and ask the user before spawning parallel agents — once approved, dispatch them together rather than serially
 
 After an agent finishes:
 
