@@ -61,7 +61,75 @@ class ShipControlsTests(unittest.TestCase):
         self.assertEqual(result.status, "missing")
         self.assertEqual(input_controller.calls, [])
 
-    def test_from_bindings_file_loads_set_speed_zero_binding(self) -> None:
+    def test_set_speed_full_dispatches_through_binding_lookup(self) -> None:
+        lookup = build_binding_lookup(
+            bindings={"SetSpeed100": Binding(key="W")},
+            actions=["SetSpeed100"],
+        )
+        input_controller = FakeInputController()
+        controls = ShipControls.from_binding_lookup(lookup, input_controller)
+
+        result = controls.set_speed_full(hold_s=0.1)
+
+        self.assertEqual(result.status, "ok")
+        self.assertEqual(result.binding.to_dict(), {"key": "w", "modifier": None})
+        self.assertEqual(input_controller.calls, [{"method": "tap", "key": "w", "modifier": None, "hold_s": 0.1}])
+
+    def test_roll_left_dispatches_through_binding_lookup(self) -> None:
+        lookup = build_binding_lookup(
+            bindings={"RollLeftButton": Binding(key="A")},
+            actions=["RollLeftButton"],
+        )
+        input_controller = FakeInputController()
+        controls = ShipControls.from_binding_lookup(lookup, input_controller)
+
+        result = controls.roll_left(repeat=2, hold_s=0.05)
+
+        self.assertEqual(result.status, "ok")
+        self.assertEqual(result.binding.to_dict(), {"key": "a", "modifier": None})
+        self.assertEqual(
+            input_controller.calls,
+            [
+                {"method": "tap", "key": "a", "modifier": None, "hold_s": 0.05},
+                {"method": "tap", "key": "a", "modifier": None, "hold_s": 0.05},
+            ],
+        )
+
+    def test_roll_right_dispatches_through_binding_lookup(self) -> None:
+        lookup = build_binding_lookup(
+            bindings={"RollRightButton": Binding(key="D", modifier="LeftShift")},
+            actions=["RollRightButton"],
+        )
+        input_controller = FakeInputController()
+        controls = ShipControls.from_binding_lookup(lookup, input_controller)
+
+        result = controls.roll_right()
+
+        self.assertEqual(result.status, "ok")
+        self.assertEqual(result.binding.to_dict(), {"key": "d", "modifier": "left_shift"})
+        self.assertEqual(
+            input_controller.calls,
+            [{"method": "tap", "key": "d", "modifier": "left_shift", "hold_s": 0.0}],
+        )
+
+    def test_ui_select_dispatches_through_binding_lookup(self) -> None:
+        lookup = build_binding_lookup(
+            bindings={"UI_Select": Binding(key="Space")},
+            actions=["UI_Select"],
+        )
+        input_controller = FakeInputController()
+        controls = ShipControls.from_binding_lookup(lookup, input_controller)
+
+        result = controls.ui_select()
+
+        self.assertEqual(result.status, "ok")
+        self.assertEqual(result.binding.to_dict(), {"key": "space", "modifier": None})
+        self.assertEqual(
+            input_controller.calls,
+            [{"method": "tap", "key": "space", "modifier": None, "hold_s": 0.0}],
+        )
+
+    def test_from_bindings_file_loads_default_ship_control_actions(self) -> None:
         input_controller = FakeInputController()
         bindings_xml = """\
 <?xml version="1.0" encoding="UTF-8"?>
@@ -69,6 +137,18 @@ class ShipControlsTests(unittest.TestCase):
   <SetSpeedZero>
     <Primary Device="Keyboard" Key="Key_X" />
   </SetSpeedZero>
+  <SetSpeed100>
+    <Primary Device="Keyboard" Key="Key_W" />
+  </SetSpeed100>
+  <RollLeftButton>
+    <Primary Device="Keyboard" Key="Key_A" />
+  </RollLeftButton>
+  <RollRightButton>
+    <Primary Device="Keyboard" Key="Key_D" />
+  </RollRightButton>
+  <UI_Select>
+    <Primary Device="Keyboard" Key="Space" />
+  </UI_Select>
 </Root>
 """
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -76,10 +156,25 @@ class ShipControlsTests(unittest.TestCase):
             bindings_file.write_text(bindings_xml, encoding="utf-8")
 
             controls = ShipControls.from_bindings_file(bindings_file, input_controller)
-            result = controls.set_speed_zero()
+            results = [
+                controls.set_speed_zero(),
+                controls.set_speed_full(),
+                controls.roll_left(),
+                controls.roll_right(),
+                controls.ui_select(),
+            ]
 
-        self.assertEqual(result.status, "ok")
-        self.assertEqual(input_controller.calls, [{"method": "tap", "key": "x", "modifier": None, "hold_s": 0.0}])
+        self.assertTrue(all(result.status == "ok" for result in results))
+        self.assertEqual(
+            input_controller.calls,
+            [
+                {"method": "tap", "key": "x", "modifier": None, "hold_s": 0.0},
+                {"method": "tap", "key": "w", "modifier": None, "hold_s": 0.0},
+                {"method": "tap", "key": "a", "modifier": None, "hold_s": 0.0},
+                {"method": "tap", "key": "d", "modifier": None, "hold_s": 0.0},
+                {"method": "tap", "key": "space", "modifier": None, "hold_s": 0.0},
+            ],
+        )
 
     def test_tap_action_dispatches_arbitrary_action(self) -> None:
         lookup = build_binding_lookup(
