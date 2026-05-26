@@ -4,8 +4,9 @@ import argparse
 import json
 import sys
 
-from edap.config import ConfigError, DEFAULT_CONFIG_PATH, EXAMPLE_CONFIG_PATH, load_config
+from edap.config import ConfigError, DEFAULT_CONFIG_PATH
 from edap.diagnostics import DiagnosticsOptions, run_diagnostics
+from edap.runtime import load_config_with_fallback
 
 
 def main() -> int:
@@ -55,21 +56,14 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    config_path = args.config
     try:
-        config = load_config(config_path)
-        using_fallback = False
+        loaded = load_config_with_fallback(args.config)
     except FileNotFoundError:
-        if config_path == str(DEFAULT_CONFIG_PATH) and EXAMPLE_CONFIG_PATH.exists():
-            config = load_config(EXAMPLE_CONFIG_PATH)
-            using_fallback = True
-            config_path = str(EXAMPLE_CONFIG_PATH)
-        else:
-            sys.stderr.write(
-                f"Config file not found: {config_path}\n"
-                f"Create `config.toml` from `config.example.toml`, or pass `--config /path/to/config.toml`.\n"
-            )
-            return 2
+        sys.stderr.write(
+            f"Config file not found: {args.config}\n"
+            f"Create `config.toml` from `config.example.toml`, or pass `--config /path/to/config.toml`.\n"
+        )
+        return 2
     except ConfigError as exc:
         sys.stderr.write(f"Invalid config: {exc}\n")
         return 2
@@ -82,9 +76,9 @@ def main() -> int:
         delay_s=args.delay_seconds,
         repeat=args.repeat,
     )
-    result = run_diagnostics(config, options)
-    result["config_path"] = config_path
-    result["used_example_config_fallback"] = using_fallback
+    result = run_diagnostics(loaded.config, options)
+    result["config_path"] = loaded.config_path
+    result["used_example_config_fallback"] = loaded.used_example_config_fallback
 
     json.dump(result, sys.stdout, indent=2)
     sys.stdout.write("\n")

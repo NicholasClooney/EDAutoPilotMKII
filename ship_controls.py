@@ -6,35 +6,9 @@ import math
 import sys
 from time import sleep
 
-from edap.config import ConfigError, DEFAULT_CONFIG_PATH, EXAMPLE_CONFIG_PATH, load_config
-from edap.platform.input.factory import build_input_controller
-from edap.platform.paths.factory import build_game_paths
+from edap.config import ConfigError, DEFAULT_CONFIG_PATH
+from edap.runtime import build_runtime_context, load_config_with_fallback
 from edap.ship_controls import ShipControls
-
-
-def _load_config_with_fallback(config_path: str):
-    try:
-        return load_config(config_path), config_path, False
-    except FileNotFoundError:
-        if config_path == str(DEFAULT_CONFIG_PATH) and EXAMPLE_CONFIG_PATH.exists():
-            return load_config(EXAMPLE_CONFIG_PATH), str(EXAMPLE_CONFIG_PATH), True
-        raise
-
-
-def _resolve_bindings_file(config) -> tuple[str | None, str]:
-    if config.paths.bindings_file:
-        if config.paths.bindings_file.exists():
-            return str(config.paths.bindings_file), "configured"
-        return None, "configured_missing"
-
-    game_paths = build_game_paths(config.runtime.platform)
-    if game_paths is None:
-        return None, "unsupported_platform"
-
-    bindings_file = game_paths.default_bindings_file()
-    if bindings_file is None:
-        return None, "auto_detect_not_found"
-    return str(bindings_file), "auto_detected"
 
 
 def _progress(message: str) -> None:
@@ -89,7 +63,7 @@ def main() -> int:
     args = parser.parse_args()
 
     try:
-        config, config_path, using_fallback = _load_config_with_fallback(args.config)
+        loaded = load_config_with_fallback(args.config)
     except FileNotFoundError:
         sys.stderr.write(
             f"Config file not found: {args.config}\n"
@@ -100,7 +74,9 @@ def main() -> int:
         sys.stderr.write(f"Invalid config: {exc}\n")
         return 2
 
-    bindings_file, bindings_source = _resolve_bindings_file(config)
+    runtime = build_runtime_context(loaded.config, actions=[args.action])
+    bindings_file = runtime.bindings.effective_path
+    bindings_source = runtime.bindings.cli_source_status()
     if bindings_file is None:
         sys.stderr.write(
             "Could not resolve bindings file. "
@@ -108,21 +84,27 @@ def main() -> int:
         )
         return 2
 
-    input_controller = build_input_controller(config.runtime.platform)
-    if input_controller is None:
-        sys.stderr.write(f"Unsupported input platform: {config.runtime.platform}\n")
+    if runtime.input_controller is None:
+        sys.stderr.write(f"Unsupported input platform: {loaded.config.runtime.platform}\n")
         return 2
 
-    controls = ShipControls.from_bindings_file(bindings_file, input_controller, actions=[args.action])
+    if runtime.binding_lookup is None:
+        sys.stderr.write(
+            "Could not load binding lookup from resolved bindings file. "
+            f"Source status: {bindings_source}.\n"
+        )
+        return 2
+
+    controls = ShipControls.from_binding_lookup(runtime.binding_lookup, runtime.input_controller)
     if args.delay_seconds > 0:
         _sleep_with_countdown(args.action, args.delay_seconds)
     _report_repeat_plan(args.action, args.repeat, args.hold_seconds)
     result = controls.tap_action(args.action, repeat=args.repeat, hold_s=args.hold_seconds)
 
     payload = {
-        "config_path": config_path,
-        "used_example_config_fallback": using_fallback,
-        "bindings_file": bindings_file,
+        "config_path": loaded.config_path,
+        "used_example_config_fallback": loaded.used_example_config_fallback,
+        "bindings_file": str(bindings_file),
         "bindings_source": bindings_source,
         "result": result.to_dict(),
     }

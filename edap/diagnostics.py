@@ -1,15 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
-from pathlib import Path
 from time import sleep
 
 from edap.bindings import read_bindings
 from edap.capture import build_capture_layout
 from edap.config import AppConfig
-from edap.platform.input.factory import build_input_controller
-from edap.platform.paths.factory import build_game_paths
-from edap.platform.screen.factory import build_screen_capture
+from edap.runtime import RuntimeContext, build_runtime_context, legacy_path_summary
 from edap.state import get_latest_journal_log, read_ship_state
 
 
@@ -24,130 +21,10 @@ class DiagnosticsOptions:
     repeat: int = 1
 
 
-def _configured_path_report(path: Path | None, *, kind: str) -> dict[str, object]:
-    if path is None:
-        return {
-            "path": None,
-            "status": "not_configured",
-            "reason": f"no explicit {kind} configured",
-        }
-
-    if not path.exists():
-        return {
-            "path": str(path),
-            "status": "missing",
-            "reason": f"configured {kind} path does not exist",
-        }
-
-    if kind == "journal directory" and not path.is_dir():
-        return {
-            "path": str(path),
-            "status": "invalid",
-            "reason": "configured journal path exists but is not a directory",
-        }
-
-    if kind == "bindings file" and not path.is_file():
-        return {
-            "path": str(path),
-            "status": "invalid",
-            "reason": "configured bindings path exists but is not a file",
-        }
-
-    return {
-        "path": str(path),
-        "status": "ok",
-        "reason": f"using configured {kind}",
-    }
-
-
-def _autodetected_path_report(game_paths: object, *, kind: str) -> dict[str, object]:
-    describe_name = "describe_journal_discovery" if kind == "journal" else "describe_bindings_discovery"
-    if game_paths is not None and hasattr(game_paths, describe_name):
-        report = getattr(game_paths, describe_name)()
-        return dict(report)
-
-    detected_path = None
-    if game_paths is not None:
-        detected_path = (
-            game_paths.default_journal_dir() if kind == "journal" else game_paths.default_bindings_file()
-        )
-
-    if detected_path is None:
-        return {
-            "path": None,
-            "status": "unsupported",
-            "reason": "platform backend did not provide auto-detection details",
-        }
-
-    return {
-        "path": str(detected_path),
-        "status": "ok",
-        "reason": "auto-detected default path",
-    }
-
-
-def _effective_path_report(
-    configured: dict[str, object],
-    autodetected: dict[str, object],
-) -> dict[str, object]:
-    if configured["status"] == "ok":
-        return {
-            "path": configured["path"],
-            "status": "ok",
-            "source": "configured",
-            "reason": configured["reason"],
-        }
-
-    autodetected_path = autodetected.get("selected_path", autodetected.get("path"))
-    autodetected_status = autodetected.get("status", "unsupported")
-    if autodetected_status == "ok" and autodetected_path:
-        return {
-            "path": autodetected_path,
-            "status": "ok",
-            "source": "auto_detected",
-            "reason": autodetected.get("reason", "auto-detected default path"),
-        }
-
-    if configured["status"] in {"missing", "invalid"}:
-        return {
-            "path": configured["path"],
-            "status": configured["status"],
-            "source": "configured",
-            "reason": configured["reason"],
-        }
-
-    return {
-        "path": None,
-        "status": autodetected_status,
-        "source": "auto_detected",
-        "reason": autodetected.get("reason", "no path available"),
-    }
-
-
-def _legacy_path_summary(configured: dict[str, object], autodetected: dict[str, object], effective: dict[str, object]) -> dict[str, object]:
-    return {
-        "configured": configured.get("path"),
-        "configured_status": configured.get("status"),
-        "auto_detected": autodetected.get("selected_path", autodetected.get("path")),
-        "auto_detected_status": autodetected.get("status"),
-        "effective": effective.get("path"),
-        "effective_status": effective.get("status"),
-    }
-
-
 def run_diagnostics(config: AppConfig, options: DiagnosticsOptions) -> dict[str, object]:
-    game_paths = build_game_paths(config.runtime.platform)
-    configured_journal_dir = config.paths.journal_dir
-    configured_bindings_file = config.paths.bindings_file
-    journal_configured = _configured_path_report(configured_journal_dir, kind="journal directory")
-    journal_autodetected = _autodetected_path_report(game_paths, kind="journal")
-    journal_effective = _effective_path_report(journal_configured, journal_autodetected)
-    bindings_configured = _configured_path_report(configured_bindings_file, kind="bindings file")
-    bindings_autodetected = _autodetected_path_report(game_paths, kind="bindings")
-    bindings_effective = _effective_path_report(bindings_configured, bindings_autodetected)
-
-    effective_journal_dir = Path(journal_effective["path"]) if journal_effective["path"] else None
-    effective_bindings_file = Path(bindings_effective["path"]) if bindings_effective["path"] else None
+    runtime = build_runtime_context(config)
+    effective_journal_dir = runtime.journal.effective_path
+    effective_bindings_file = runtime.bindings.effective_path
 
     result: dict[str, object] = {
         "platform": config.runtime.platform,
@@ -159,18 +36,18 @@ def run_diagnostics(config: AppConfig, options: DiagnosticsOptions) -> dict[str,
         },
         "paths": {
             "journal": {
-                "configured": journal_configured,
-                "auto_detected": journal_autodetected,
-                "effective": journal_effective,
+                "configured": runtime.journal.configured,
+                "auto_detected": runtime.journal.auto_detected,
+                "effective": runtime.journal.effective,
             },
             "bindings": {
-                "configured": bindings_configured,
-                "auto_detected": bindings_autodetected,
-                "effective": bindings_effective,
+                "configured": runtime.bindings.configured,
+                "auto_detected": runtime.bindings.auto_detected,
+                "effective": runtime.bindings.effective,
             },
             "legacy_summary": {
-                "journal": _legacy_path_summary(journal_configured, journal_autodetected, journal_effective),
-                "bindings": _legacy_path_summary(bindings_configured, bindings_autodetected, bindings_effective),
+                "journal": legacy_path_summary(runtime.journal),
+                "bindings": legacy_path_summary(runtime.bindings),
             },
         },
         "options": asdict(options),
@@ -206,20 +83,21 @@ def run_diagnostics(config: AppConfig, options: DiagnosticsOptions) -> dict[str,
         result["bindings_result"] = {
             "status": "not_available",
             "path": str(effective_bindings_file) if effective_bindings_file else None,
-            "reason": bindings_effective["reason"],
+            "reason": runtime.bindings.effective["reason"],
         }
 
     if options.capture_screen:
-        result["screen_capture"] = run_screen_capture_diagnostic(config)
+        result["screen_capture"] = run_screen_capture_diagnostic(config, runtime)
 
     if options.send_test_key:
-        result["input_test"] = run_input_diagnostic(config, options)
+        result["input_test"] = run_input_diagnostic(config, options, runtime)
 
     return result
 
 
-def run_screen_capture_diagnostic(config: AppConfig) -> dict[str, object]:
-    screen_capture = build_screen_capture(config.runtime.platform)
+def run_screen_capture_diagnostic(config: AppConfig, runtime: RuntimeContext | None = None) -> dict[str, object]:
+    runtime = runtime or build_runtime_context(config)
+    screen_capture = runtime.screen_capture
     if screen_capture is None:
         return {"status": "unsupported"}
 
@@ -251,12 +129,17 @@ def run_screen_capture_diagnostic(config: AppConfig) -> dict[str, object]:
     }
 
 
-def run_input_diagnostic(config: AppConfig, options: DiagnosticsOptions) -> dict[str, object]:
+def run_input_diagnostic(
+    config: AppConfig,
+    options: DiagnosticsOptions,
+    runtime: RuntimeContext | None = None,
+) -> dict[str, object]:
     try:
-        input_controller = build_input_controller(config.runtime.platform)
+        runtime = runtime or build_runtime_context(config)
     except Exception as exc:
         return {"status": "error", "error": str(exc)}
 
+    input_controller = runtime.input_controller
     if input_controller is None:
         return {"status": "unsupported"}
 

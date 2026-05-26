@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import io
 import json
-import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
 import ship_controls
+from edap.config import load_config
+from edap.runtime import LoadedConfig
 
 
 class _FakeControls:
@@ -30,37 +31,38 @@ class _FakeControls:
 
 
 class ShipControlsCliTests(unittest.TestCase):
-    def test_resolve_bindings_file_prefers_configured_path(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            bindings_file = Path(temp_dir) / "Custom.binds"
-            bindings_file.write_text("<Root />", encoding="utf-8")
-            config = ship_controls.load_config("config.example.toml")
-            config = config.__class__(
-                paths=config.paths.__class__(journal_dir=config.paths.journal_dir, bindings_file=bindings_file),
-                controls=config.controls,
-                screen=config.screen,
-                runtime=config.runtime,
-            )
-
-            resolved, source = ship_controls._resolve_bindings_file(config)
-
-            self.assertEqual(resolved, str(bindings_file))
-            self.assertEqual(source, "configured")
-
     def test_main_dispatches_action_and_emits_json(self) -> None:
         fake_controls = _FakeControls({"action": "RollLeftButton", "status": "ok"})
+        loaded = LoadedConfig(
+            config=load_config("config.example.toml"),
+            config_path="config.example.toml",
+            used_example_config_fallback=True,
+        )
+        runtime = type(
+            "_Runtime",
+            (),
+            {
+                "bindings": type(
+                    "_Bindings",
+                    (),
+                    {
+                        "effective_path": Path("/tmp/Custom.binds"),
+                        "cli_source_status": staticmethod(lambda: "auto_detected"),
+                    },
+                )(),
+                "input_controller": object(),
+                "binding_lookup": object(),
+            },
+        )()
 
-        with patch("ship_controls._load_config_with_fallback") as load_config_mock, patch(
-            "ship_controls._resolve_bindings_file",
-            return_value=("/tmp/Custom.binds", "auto_detected"),
-        ), patch("ship_controls.build_input_controller", return_value=object()), patch(
-            "ship_controls.ShipControls.from_bindings_file",
+        with patch("ship_controls.load_config_with_fallback", return_value=loaded), patch(
+            "ship_controls.build_runtime_context",
+            return_value=runtime,
+        ), patch("ship_controls.ShipControls.from_binding_lookup",
             return_value=fake_controls,
         ), patch("sys.stdout", new_callable=io.StringIO) as stdout, patch(
             "sys.stderr", new_callable=io.StringIO
         ) as stderr:
-            load_config_mock.return_value = (ship_controls.load_config("config.example.toml"), "config.example.toml", True)
-
             with patch("sys.argv", ["ship_controls.py", "--action", "RollLeftButton", "--repeat", "2", "--hold-seconds", "0.1"]):
                 exit_code = ship_controls.main()
 
