@@ -33,6 +33,17 @@ The current engineering focus is wiring parsed bindings and small runtime action
 - Make incremental changes that are easy to validate.
 - If implementation reveals a new runtime or behavioral assumption, verify it with the user before baking it into defaults, heuristics, or policy-level behavior.
 
+### Manual Harness Scope
+
+- Keep `ship_controls.py` as the human test surface for live in-game control testing.
+- Add only the smallest features that materially improve manual verification loops.
+- Avoid turning it into a second app, console, or long-term runtime surface.
+
+### Manual Test Sequencing
+
+- When generating test sequences with contradictory actions, leave time between them so the effect is observable. Examples: `SetSpeedZero -> SetSpeed100 -> SetSpeedZero`, `RollLeftButton -> RollRightButton -> RollLeftButton`.
+- Prefer explicit per-step `delay=` in `ship_controls.py` sequences for this spacing.
+
 ## Agent Loop
 
 When work is delegated to agents:
