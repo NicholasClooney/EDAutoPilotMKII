@@ -44,6 +44,12 @@ Later manual testing narrowed the conclusion:
 - later manual sequencing confirmed that contradictory actions should be separated with explicit delays when the goal is to observe each effect clearly
 - later experiments showed that modifier-combo ship controls such as `Ctrl+...` are still unresolved through the current `System Events` backend
 - an attempted letter-to-key-code macOS input change regressed previously working plain-key ship controls and was reverted to restore the last known-good sequence behavior
+- yaw and pitch (`[ ] , .`) regressed when punctuation was routed through `key down key code N` while letters stayed on `key down "x"`: the keycode-form events reached the chat window but not the in-game flight controls, matching the same pattern as the earlier letter-to-keycode regression
+- `[ ] , .` were moved back to the character form `key down "x"`, leaving the other punctuation entries (`/ \ ; ' - =`) on the keycode path for now since they were not part of the observed regression; the bindings affected were confirmed against `python3 check_bindings.py --json`
+- after the punctuation fix, `[ ] ,` started actuating yaw and pitch up in flight, but `.` (PitchDownButton bound to `Key_Period`) still did not move the ship even though it kept producing `.` in chat
+- every osascript variant tried for `.` had the same result in flight: `key down "."` + `key up "."` with hold, `key down key code 47` with hold, `keystroke "."`, a variable form `set k to "."`, and an ASCII form `set k to (ASCII character 46)` — all five reached chat as a period, none triggered PitchDownButton
+- rebinding `PitchDownButton` in ED from `.` to a letter (`i`) made the same action work immediately, so the bindings file shape, the action dispatcher, and the macOS backend are all fine; the failure is below our layer where the scancode AppleScript generates for `.` does not match what ED resolves as `Key_Period` for flight controls on this CrossOver setup, even though it does match for text input
+- working assumption: this is an osascript→CrossOver routing quirk specific to certain keys, not a bad binding; users hitting the same issue can rebind `PitchDownButton` (or any other affected binding) to a letter as a workaround until a lower-level input backend is in place
 
 ## What Is Implemented
 

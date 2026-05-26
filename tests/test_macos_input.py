@@ -57,16 +57,18 @@ class MacOSInputControllerTests(unittest.TestCase):
             "end tell",
         )
 
-    def test_punctuation_keys_use_key_codes(self) -> None:
+    def test_bracket_and_comma_period_use_character_form(self) -> None:
         input_controller = MacOSInputController()
 
-        script = input_controller._build_tap_script(".", hold_s=0.2)
+        for character in (",", ".", "[", "]"):
+            with self.subTest(character=character):
+                script = input_controller._build_tap_script(character, hold_s=0.2)
 
-        self.assertEqual(
-            script,
-            'tell application "System Events"\n'
-            "  key down key code 47\n"
-            "  delay 0.200\n"
-            "  key up key code 47\n"
-            "end tell",
-        )
+                self.assertEqual(
+                    script,
+                    'tell application "System Events"\n'
+                    f'  key down "{character}"\n'
+                    "  delay 0.200\n"
+                    f'  key up "{character}"\n'
+                    "end tell",
+                )

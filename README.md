@@ -106,6 +106,43 @@ Current behavior:
 
 On macOS, synthetic input and screen capture may require Accessibility or Screen Recording permissions depending on system settings.
 
+## Manual Utility Scripts
+
+Beyond `diagnostics.py`, two scripts are useful for poking at bindings and exercising single controls. Both honor the same `--config` flag and reuse the shared runtime context.
+
+### `check_bindings.py`
+
+Verifies which Elite actions resolve to a usable binding for the current bindings file.
+
+```sh
+python3 check_bindings.py
+python3 check_bindings.py --verbose
+python3 check_bindings.py --json
+```
+
+The plain output reports required-binding coverage. `--verbose` adds optional bindings. `--json` emits a full structured payload that includes `all_supported` and `all_issues`, which is the easiest way to discover what key and modifier are bound to a given action.
+
+To inspect specific actions, pipe the JSON into `jq` or a small Python snippet:
+
+```sh
+python3 check_bindings.py --json | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['all_supported'].get('YawLeftButton'))"
+```
+
+### `ship_controls.py`
+
+Sends one or more ship-control actions through the binding lookup and the macOS input backend. Useful for confirming that a key actually reaches the in-game cockpit.
+
+```sh
+python3 ship_controls.py --action SetSpeedZero --delay-seconds 3
+python3 ship_controls.py --delay-seconds 3 --sequence "SetSpeedZero; RollLeftButton total=0.45; SetSpeed100 delay=5"
+```
+
+Per-step fields inside `--sequence` are `repeat=<n> hold=<seconds> total=<seconds> delay=<seconds>`. `total=` is only valid for continuous controls (roll, yaw, pitch) and plans the number of repeated activations from the requested total actuation time. `delay=` pauses before the step so the game window can stay focused between effects.
+
+Plain unmodified ship-control keys are the current known-good path. Modifier-combo bindings such as `Ctrl+...` are not yet reliable through the `System Events` backend.
+
+Some individual keys can also route correctly to chat but silently fail to trigger their in-flight binding. The confirmed case so far is `.` (`Key_Period`): every osascript form tried (string, keycode, `keystroke`, variable, ASCII character) produced a period in chat but did not move the ship when bound to `PitchDownButton`, while the same action works immediately after rebinding to a letter. If you hit this on another key, rebind the affected control inside ED to a letter as a workaround until a lower-level input backend (Quartz / CGEvent) replaces the `osascript` path.
+
 ## Configuration Direction
 
 The project is moving away from hardcoded assumptions such as:
