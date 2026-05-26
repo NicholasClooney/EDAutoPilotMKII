@@ -102,6 +102,7 @@ def build_runtime_context(
     config: AppConfig,
     *,
     actions: Iterable[str] | None = None,
+    include_screen_capture: bool = False,
 ) -> RuntimeContext:
     game_paths = build_game_paths(config.runtime.platform)
     journal = resolve_journal_path(config, game_paths=game_paths)
@@ -118,7 +119,7 @@ def build_runtime_context(
         journal=journal,
         bindings=bindings,
         input_controller=build_input_controller(config.runtime.platform),
-        screen_capture=build_screen_capture(config.runtime.platform),
+        screen_capture=build_screen_capture(config.runtime.platform) if include_screen_capture else None,
         binding_lookup=binding_lookup,
     )
 

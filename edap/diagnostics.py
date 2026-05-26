@@ -22,7 +22,7 @@ class DiagnosticsOptions:
 
 
 def run_diagnostics(config: AppConfig, options: DiagnosticsOptions) -> dict[str, object]:
-    runtime = build_runtime_context(config)
+    runtime = build_runtime_context(config, include_screen_capture=options.capture_screen)
     effective_journal_dir = runtime.journal.effective_path
     effective_bindings_file = runtime.bindings.effective_path
 
@@ -33,6 +33,8 @@ def run_diagnostics(config: AppConfig, options: DiagnosticsOptions) -> dict[str,
             "start_hotkey": config.controls.start_hotkey,
             "stop_hotkey": config.controls.stop_hotkey,
             "scanner_mode": config.controls.scanner_mode,
+            "minimum_action_hold_seconds": config.controls.minimum_action_hold_seconds,
+            "continuous_action_hold_seconds": config.controls.continuous_action_hold_seconds,
         },
         "paths": {
             "journal": {
@@ -96,7 +98,9 @@ def run_diagnostics(config: AppConfig, options: DiagnosticsOptions) -> dict[str,
 
 
 def run_screen_capture_diagnostic(config: AppConfig, runtime: RuntimeContext | None = None) -> dict[str, object]:
-    runtime = runtime or build_runtime_context(config)
+    runtime = runtime or build_runtime_context(config, include_screen_capture=True)
+    if runtime.screen_capture is None:
+        runtime = build_runtime_context(config, include_screen_capture=True)
     screen_capture = runtime.screen_capture
     if screen_capture is None:
         return {"status": "unsupported"}

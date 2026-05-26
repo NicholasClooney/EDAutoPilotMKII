@@ -131,6 +131,20 @@ bindings_file = "{bindings_file}"
         self.assertEqual(runtime.bindings.effective_path, auto_bindings_file)
         self.assertIsNone(runtime.binding_lookup)
 
+    def test_build_runtime_context_skips_screen_capture_by_default(self) -> None:
+        config = load_config("config.example.toml")
+
+        with patch("edap.runtime.build_game_paths", return_value=None), patch(
+            "edap.runtime.build_input_controller",
+            return_value=object(),
+        ), patch(
+            "edap.runtime.build_screen_capture",
+        ) as build_screen_capture_mock:
+            runtime = build_runtime_context(config, actions=["SetSpeedZero"])
+
+        self.assertIsNone(runtime.screen_capture)
+        build_screen_capture_mock.assert_not_called()
+
     def test_build_runtime_context_reports_missing_configured_bindings(self) -> None:
         with TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
