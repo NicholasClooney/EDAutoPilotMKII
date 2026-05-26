@@ -27,8 +27,9 @@ from edap.runtime import build_runtime_context, load_config_with_fallback
 
 
 TOP_ROW_TITLES = ("Roll & Throttle", "Pitch & Yaw")
-LOWER_LEFT_TITLE = "UI Navigation"
-LOWER_RIGHT_TITLES = ("Combat & Targeting", "Cockpit & Travel", "Unmapped")
+MIDDLE_LEFT_TITLE = "UI Navigation"
+MIDDLE_RIGHT_TITLES = ("Combat & Targeting", "Cockpit & Travel")
+BOTTOM_TITLE = "Unmapped"
 
 
 def main() -> int:
@@ -70,28 +71,35 @@ def main() -> int:
 
     groups_by_title = {g.title: g for g in groups}
 
-    left_group = groups_by_title.get(LOWER_LEFT_TITLE)
-    right_groups = [
+    middle_left_group = groups_by_title.get(MIDDLE_LEFT_TITLE)
+    middle_right_groups = [
         groups_by_title[title]
-        for title in LOWER_RIGHT_TITLES
+        for title in MIDDLE_RIGHT_TITLES
         if title in groups_by_title
     ]
+    bottom_group = groups_by_title.get(BOTTOM_TITLE)
 
-    if left_group is not None and right_groups:
-        left_panel = _render_group_panel(left_group)
-        right_panels = [_render_group_panel(g) for g in right_groups]
+    rendered_middle = False
+    if middle_left_group is not None and middle_right_groups:
+        left_panel = _render_group_panel(middle_left_group)
+        right_panels = [_render_group_panel(g) for g in middle_right_groups]
         right_stack = Group(*right_panels)
-        lower_grid = Table.grid(expand=True, padding=(0, 0))
-        lower_grid.add_column(ratio=1)
-        lower_grid.add_column(ratio=1)
-        lower_grid.add_row(left_panel, right_stack)
-        console.print(lower_grid)
-    else:
-        # Fallback: render whatever lower panels exist in order.
+        middle_grid = Table.grid(expand=True, padding=(0, 0))
+        middle_grid.add_column(ratio=1)
+        middle_grid.add_column(ratio=1)
+        middle_grid.add_row(left_panel, right_stack)
+        console.print(middle_grid)
+        rendered_middle = True
+
+    if not rendered_middle:
+        # Fallback: render whatever middle panels exist in order.
         for group in groups:
-            if group.title in TOP_ROW_TITLES:
+            if group.title in TOP_ROW_TITLES or group.title == BOTTOM_TITLE:
                 continue
             console.print(_render_group_panel(group))
+
+    if bottom_group is not None and bottom_group.rows:
+        console.print(_render_group_panel(bottom_group))
 
     return 0 if not any(g.is_unmapped for g in groups) else 1
 
