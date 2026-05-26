@@ -29,6 +29,33 @@ REQUIRED_BINDINGS = [
     "MouseReset",
 ]
 
+AUTOPILOT_REQUIRED_BINDINGS = [
+    "YawLeftButton",
+    "YawRightButton",
+    "RollLeftButton",
+    "RollRightButton",
+    "PitchUpButton",
+    "PitchDownButton",
+    "SetSpeedZero",
+    "SetSpeed100",
+    "HyperSuperCombination",
+    "UIFocus",
+    "UI_Up",
+    "UI_Down",
+    "UI_Left",
+    "UI_Right",
+    "UI_Select",
+    "UI_Back",
+    "CycleNextPanel",
+    "HeadLookReset",
+]
+
+AUTOPILOT_OPTIONAL_BINDINGS = [
+    "PrimaryFire",
+    "SecondaryFire",
+    "MouseReset",
+]
+
 
 MODIFIER_ALIASES = {
     "Key_LeftShift": "LeftShift",
