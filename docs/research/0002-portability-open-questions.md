@@ -50,12 +50,11 @@ Question:
 
 What operations should the input backend guarantee beyond a simple tap?
 
-Why this is still research:
+Current evidence:
 
-- the current macOS path is proven for diagnostic key taps
-- autopilot behavior will likely need reliable hold, release, combo, and repeated-input semantics
-- `osascript` may be sufficient for coarse actions, but not for tighter continuous control
-- we still need to verify whether Elite through CrossOver treats true held directional input materially differently from rapid repeated taps
+- manual testing on the current macOS + CrossOver setup indicates repeated tapping is sufficient for the first control ports
+- the current macOS path is therefore usable for early keyboard-driven runtime actions on this machine
+- this is still not universal proof for every setup or for later backends
 
 What the implementation should eventually decide:
 
@@ -65,14 +64,14 @@ What the implementation should eventually decide:
 - retry or pacing behavior
 - whether the diagnostic backend and the runtime backend should remain the same implementation
 
-Critical gate before steering extraction:
+Remaining caution:
 
-- test whether `Pitch*`, `Yaw*`, and `Roll*` actions need true held state, or whether repeated tap sequences are behaviorally sufficient
-- do not port steering-heavy routines like `align()` until this is known
+- keep treating hold semantics as an interface capability question
+- re-check the assumption if later steering behavior or another machine suggests repeated taps are not enough
 
 Recommended next trigger:
 
-Do this after the first binding-driven action is wired, because that will expose whether the current backend is merely acceptable for diagnostics or viable for runtime control.
+Do this after the first binding-driven action is wired, because that will expose whether the current backend remains acceptable beyond the initial manual test.
 
 ## 3. Screen And Capture Calibration Model
 

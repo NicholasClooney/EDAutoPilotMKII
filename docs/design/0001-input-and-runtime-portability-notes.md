@@ -112,19 +112,9 @@ Minimum operations:
 
 The backend should also make limitations explicit. If the macOS backend cannot reliably support true held-state behavior for certain actions, that should be visible at the interface or capability level instead of being hidden.
 
-### Immediate next step
+### Current evidence
 
-Document backend capabilities and test whether the current macOS implementation can reliably support:
-
-- simple tap
-- repeated tap
-- press followed by delayed release
-
-If not, keep diagnostic input and flight-control input as separate maturity levels.
-
-### Critical assumption to verify
-
-We still need to verify whether Elite Dangerous through CrossOver requires true held key state for flight axes, or whether rapid repeated taps are behaviorally sufficient.
+Manual testing on the current macOS + CrossOver setup indicates that repeated tapping is behaviorally sufficient for the first control ports.
 
 This matters most for:
 
@@ -135,7 +125,17 @@ This matters most for:
 - `RollLeftButton`
 - `RollRightButton`
 
-This is a gate for porting steering-heavy routines such as alignment. If true hold semantics are required, the current macOS diagnostic input path may be sufficient for discrete actions but insufficient for flight control.
+The result should be treated as setup-specific evidence, not a universal guarantee. It reduces the blocker for the first keyboard-driven runtime actions on this machine, but it does not yet prove that every machine, display setup, or future backend will behave the same way.
+
+### Immediate next step
+
+Document backend capabilities and keep the interface level explicit:
+
+- simple tap
+- repeated tap
+- press followed by delayed release
+
+The first runtime ports on this machine can assume repeated taps are acceptable. True held-state semantics remain a future capability question rather than a current gate.
 
 ## 3. Screen and Capture Calibration Model
 
@@ -230,8 +230,8 @@ So these are not alternative choices. They are adjacent layers in the same direc
 
 ## Open Questions
 
-- How reliable is `osascript` for held directional control in Elite through CrossOver?
-- Does Elite treat held directional input materially differently from rapid repeated taps for flight axes?
+- How reliable is `osascript` for held directional control in Elite through CrossOver beyond the current machine?
+- Does any later runtime action reveal a material difference between held directional input and repeated taps on other setups?
 - Should unsupported or mouse-only Elite bindings be surfaced as warnings or hard errors?
 - How many CrossOver bottle layouts do we need to support before adding bottle-aware selection?
 - Do we need a later calibration command for CV region tuning?

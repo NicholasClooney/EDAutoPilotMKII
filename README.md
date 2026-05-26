@@ -26,6 +26,8 @@ In short, the current checkpoint has already proven:
 
 The current implementation focus is the seam between parsed Elite bindings and future runtime actions, followed by small action ports onto the new platform interfaces.
 
+On the current macOS + CrossOver setup, manual testing suggests repeated key taps are sufficient for the first keyboard-driven control ports. Treat that as machine-specific evidence, not a general guarantee.
+
 ## What `diagnostics.py` Is
 
 `diagnostics.py` is the diagnostic runner entry point.

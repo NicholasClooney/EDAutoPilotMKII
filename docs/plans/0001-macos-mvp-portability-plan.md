@@ -202,7 +202,7 @@ Still incomplete:
 
 - the legacy autopilot loop has not been migrated onto the new interfaces
 - bindings discovery still depends on a `.binds` file existing inside the active bottle layout
-- held flight-axis input semantics are still unverified on macOS + CrossOver
+- repeated taps are manually verified as sufficient for the first keyboard-driven control ports on the current macOS + CrossOver setup, but this remains setup-specific evidence rather than a universal guarantee
 - the normalized binding lookup seam exists, but it is not yet wired into runtime actions
 - the capture calibration seam exists, but the legacy CV pipeline has not been ported onto it yet
 - the new verification harness exists, but broader runtime and integration coverage is still needed
@@ -289,7 +289,7 @@ Finish the transition from diagnostics plumbing to autopilot portability:
 - keep improving bottle-aware CrossOver path selection as needed
 - add stronger local config workflow
 - wire runtime actions through the normalized binding lookup seam
-- verify hold-versus-tap behavior for flight-axis controls
-- port the first real autopilot actions onto the new platform interfaces
+- port `SetSpeedZero` as the first small binding-driven runtime action
+- treat hold-versus-tap as a follow-up capability question instead of a current gate
 
 This is the next pickup point for the following agent.

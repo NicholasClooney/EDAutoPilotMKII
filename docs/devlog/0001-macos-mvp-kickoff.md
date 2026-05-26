@@ -23,6 +23,7 @@ The following are now proven on the current macOS + CrossOver setup:
 - journal parsing works against a real Elite Dangerous journal
 - screen capture works
 - synthetic key delivery into the focused CrossOver Elite window works
+- repeated tapping is sufficient for the first keyboard-driven control ports on this machine
 
 The last point was first confirmed with a direct `osascript` keystroke test, then validated through `diagnostics.py` using:
 
@@ -58,7 +59,7 @@ Observed result: `jjj` arrived in the focused Elite Dangerous window.
 - there is not yet a real `config.toml` in the repo root
 - the legacy autopilot loop has not been ported onto the new interfaces
 - the normalized binding lookup seam exists, but it is not yet wired into runtime actions
-- we still need to verify whether flight axes require true hold semantics or whether repeated taps are sufficient
+- true held-state semantics remain a future capability question, but they are no longer a blocker for the first action ports on this setup
 
 ## Recommended Next Step
 
@@ -66,5 +67,5 @@ The next agent should focus on:
 
 1. config validation and local `config.toml` workflow
 2. binding-driven runtime actions using the new lookup seam
-3. held-input verification for pitch, yaw, and roll controls
-4. porting the first real autopilot actions onto the new interfaces
+3. a first small action port, with `SetSpeedZero` as the preferred candidate
+4. porting later steering-heavy actions only after the early runtime path is stable

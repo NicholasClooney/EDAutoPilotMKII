@@ -32,6 +32,23 @@ The current engineering focus is wiring parsed bindings and small runtime action
 - Preserve existing OpenCV/navigation behavior unless a change is required for portability.
 - Make incremental changes that are easy to validate.
 
+## Agent Loop
+
+When work is delegated to agents:
+
+- give each agent a narrow, disjoint ownership scope
+- prefer concrete implementation or verification slices over broad analysis
+- require the agent to verify its own work locally when practical
+- require the agent to report changed files, what works, what remains unresolved, and key assumptions
+
+After an agent finishes:
+
+- make sure its work is documented if the result changes project understanding, status, or next steps
+- integrate and commit the work atomically in logically grouped commits
+- close the completed agent once its work has been captured
+
+Do not leave completed agent work floating in the worktree without either committing it or intentionally discarding it.
+
 ## Commit Style
 
 Use Conventional Commits for new commits.
