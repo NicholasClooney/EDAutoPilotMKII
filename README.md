@@ -26,7 +26,7 @@ In short, the current checkpoint has already proven:
 - screen capture from the visible game on macOS
 - synthetic keyboard input into the CrossOver Elite Dangerous window
 
-The current implementation focus is the seam between parsed Elite bindings and future runtime actions, followed by small action ports onto the new platform interfaces.
+The current implementation focus is the seam between parsed Elite bindings and future runtime actions, using a shared runtime context plus small action ports onto the new platform interfaces.
 
 On the current macOS + CrossOver setup, manual testing now shows a narrower result:
 

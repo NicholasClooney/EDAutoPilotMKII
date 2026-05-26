@@ -31,6 +31,7 @@ The current engineering focus is wiring parsed bindings and small runtime action
 - Treat macOS as the primary target until the diagnostic path is stable.
 - Preserve existing OpenCV/navigation behavior unless a change is required for portability.
 - Make incremental changes that are easy to validate.
+- If implementation reveals a new runtime or behavioral assumption, verify it with the user before baking it into defaults, heuristics, or policy-level behavior.
 
 ## Agent Loop
 

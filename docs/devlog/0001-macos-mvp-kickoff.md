@@ -65,14 +65,15 @@ Later manual testing narrowed the conclusion:
 
 - there is not yet a real `config.toml` in the repo root
 - the legacy autopilot loop has not been ported onto the new interfaces
-- the normalized binding lookup seam exists, but it is not yet wired into runtime actions
+- a shared runtime assembly layer now exists, but it is still narrow and CLI-focused
+- the binding lookup seam is now wired into a first small set of runtime actions plus one tiny composed routine
 - broader ship-control coverage and pacing still need validation, but the macOS runtime input backend now has the required press/release foundation
 
 ## Recommended Next Step
 
 The next agent should focus on:
 
-1. config validation and local `config.toml` workflow
-2. binding-driven runtime actions using the new lookup seam
-3. a first small action port, with `SetSpeedZero` as the preferred candidate
+1. validating dwell thresholds for more concrete ship-control actions
+2. expanding the small runtime action surface where the bindings model already supports it
+3. using the shared runtime context as the base for later autopilot-facing flows
 4. porting later steering-heavy actions only after the early runtime path is stable

@@ -141,6 +141,22 @@ Document backend capabilities and keep the interface level explicit:
 
 The first runtime ports should use real key-down, short dwell, and key-up behavior in the macOS backend for flight controls.
 
+### Manual harness boundary
+
+`ship_controls.py` should remain the human testing harness for live in-game verification.
+
+That means:
+
+- keep the CLI narrow and task-focused
+- add only small features that materially improve manual testing
+- avoid growing it into a second app or a long-term runtime shell
+
+Reasonable next additions if needed:
+
+- configurable interval between repeats
+- dry-run binding resolution
+- explicit `tap`, `press`, and `release` modes
+
 ## 3. Screen and Capture Calibration Model
 
 ### Problem

@@ -25,3 +25,10 @@
 - Extend it as needed for direct action testing beyond `SetSpeedZero`.
 - Confirmed on the current setup: flight controls respond when the macOS backend sends real key-down, short dwell, and key-up events.
 - Use this path as the baseline for further ship-control testing instead of the older tap-style `keystroke` behavior.
+
+### Manual harness
+
+- Keep `ship_controls.py` as the human test surface for live in-game control testing.
+- Add only the smallest features that materially improve manual verification loops.
+- Avoid turning it into a second app, console, or long-term runtime surface.
+- Good future candidates: `--interval-seconds`, `--dry-run`, and explicit `tap|press|release` mode selection.
