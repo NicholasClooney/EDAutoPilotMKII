@@ -23,6 +23,8 @@ class ControlsConfig:
     start_hotkey: str
     stop_hotkey: str
     scanner_mode: str
+    minimum_action_hold_seconds: float
+    continuous_action_hold_seconds: float
 
 
 @dataclass(frozen=True)
@@ -157,6 +159,15 @@ def validate_config(config: AppConfig) -> AppConfig:
         raise ConfigError("Config value `controls.start_hotkey` cannot be empty.")
     if not config.controls.stop_hotkey.strip():
         raise ConfigError("Config value `controls.stop_hotkey` cannot be empty.")
+    if config.controls.minimum_action_hold_seconds <= 0:
+        raise ConfigError("Config value `controls.minimum_action_hold_seconds` must be greater than 0.")
+    if config.controls.continuous_action_hold_seconds <= 0:
+        raise ConfigError("Config value `controls.continuous_action_hold_seconds` must be greater than 0.")
+    if config.controls.continuous_action_hold_seconds < config.controls.minimum_action_hold_seconds:
+        raise ConfigError(
+            "Config value `controls.continuous_action_hold_seconds` must be greater than or equal to "
+            "`controls.minimum_action_hold_seconds`."
+        )
     if config.screen.resolution_width <= 0:
         raise ConfigError("Config value `screen.resolution_width` must be greater than 0.")
     if config.screen.resolution_height <= 0:
@@ -236,6 +247,8 @@ def load_config(path: Path | str = DEFAULT_CONFIG_PATH) -> AppConfig:
             start_hotkey=_string(controls, "start_hotkey", "home"),
             stop_hotkey=_string(controls, "stop_hotkey", "end"),
             scanner_mode=_string(controls, "scanner_mode", "off"),
+            minimum_action_hold_seconds=_float(controls, "minimum_action_hold_seconds", 0.1),
+            continuous_action_hold_seconds=_float(controls, "continuous_action_hold_seconds", 0.2),
         ),
         screen=ScreenConfig(
             resolution_width=_integer(screen, "resolution_width", 1920),

@@ -23,7 +23,13 @@ def _sleep_with_countdown(action: str, delay_seconds: float) -> None:
         remaining -= 1
 
 
-def _report_repeat_plan(action: str, repeat: int, hold_s: float) -> None:
+def _report_repeat_plan(action: str, repeat: int, hold_s: float, total_s: float | None = None) -> None:
+    if total_s is not None:
+        _progress(
+            f"Planned {action} for total {total_s:.2f}s as {repeat} activations "
+            f"at {hold_s:.2f}s each."
+        )
+        return
     if repeat == 1:
         _progress(f"Sending {action} once (hold {hold_s:.2f}s).")
         return
@@ -51,8 +57,14 @@ def main() -> int:
     parser.add_argument(
         "--hold-seconds",
         type=float,
-        default=0.0,
-        help="Optional hold duration per tap",
+        default=None,
+        help="Optional hold duration per activation. If omitted, continuous controls use config defaults.",
+    )
+    parser.add_argument(
+        "--total-seconds",
+        type=float,
+        default=None,
+        help="Total actuation time for continuous controls. The command will plan repeated activations from this.",
     )
     parser.add_argument(
         "--delay-seconds",
@@ -95,11 +107,31 @@ def main() -> int:
         )
         return 2
 
-    controls = ShipControls.from_binding_lookup(runtime.binding_lookup, runtime.input_controller)
+    controls = ShipControls.from_binding_lookup(
+        runtime.binding_lookup,
+        runtime.input_controller,
+        minimum_action_hold_s=loaded.config.controls.minimum_action_hold_seconds,
+        continuous_action_hold_s=loaded.config.controls.continuous_action_hold_seconds,
+    )
+    try:
+        plan = controls.plan_action(
+            args.action,
+            repeat=args.repeat,
+            hold_s=args.hold_seconds,
+            total_s=args.total_seconds,
+        )
+    except ValueError as exc:
+        sys.stderr.write(f"Invalid control request: {exc}\n")
+        return 2
     if args.delay_seconds > 0:
         _sleep_with_countdown(args.action, args.delay_seconds)
-    _report_repeat_plan(args.action, args.repeat, args.hold_seconds)
-    result = controls.tap_action(args.action, repeat=args.repeat, hold_s=args.hold_seconds)
+    _report_repeat_plan(plan.action, plan.repeat, plan.hold_s, total_s=plan.total_s)
+    result = controls.dispatch_action(
+        args.action,
+        repeat=args.repeat,
+        hold_s=args.hold_seconds,
+        total_s=args.total_seconds,
+    )
 
     payload = {
         "config_path": loaded.config_path,

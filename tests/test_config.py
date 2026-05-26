@@ -36,10 +36,73 @@ class LoadConfigTests(unittest.TestCase):
             self.assertIsNone(config.paths.bindings_file)
             self.assertEqual(config.controls.start_hotkey, "home")
             self.assertEqual(config.controls.stop_hotkey, "end")
+            self.assertEqual(config.controls.minimum_action_hold_seconds, 0.1)
+            self.assertEqual(config.controls.continuous_action_hold_seconds, 0.2)
             self.assertEqual(config.screen.resolution_width, 1920)
             self.assertEqual(config.screen.capture.mode, "fullscreen")
             self.assertIn("center", config.screen.capture.regions)
             self.assertEqual(config.runtime.platform, "macos")
+
+    def test_rejects_non_positive_continuous_hold_setting(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "config.toml"
+            _write_config(
+                config_path,
+                """
+[paths]
+
+[controls]
+continuous_action_hold_seconds = 0.0
+
+[screen]
+
+[runtime]
+""".strip(),
+            )
+
+            with self.assertRaisesRegex(ConfigError, "continuous_action_hold_seconds"):
+                load_config(config_path)
+
+    def test_rejects_non_positive_minimum_hold_setting(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "config.toml"
+            _write_config(
+                config_path,
+                """
+[paths]
+
+[controls]
+minimum_action_hold_seconds = 0.0
+
+[screen]
+
+[runtime]
+""".strip(),
+            )
+
+            with self.assertRaisesRegex(ConfigError, "minimum_action_hold_seconds"):
+                load_config(config_path)
+
+    def test_rejects_continuous_hold_below_minimum_hold(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "config.toml"
+            _write_config(
+                config_path,
+                """
+[paths]
+
+[controls]
+minimum_action_hold_seconds = 0.15
+continuous_action_hold_seconds = 0.1
+
+[screen]
+
+[runtime]
+""".strip(),
+            )
+
+            with self.assertRaisesRegex(ConfigError, "continuous_action_hold_seconds"):
+                load_config(config_path)
 
     def test_loads_capture_region_overrides(self) -> None:
         with TemporaryDirectory() as temp_dir:

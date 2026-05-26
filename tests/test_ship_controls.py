@@ -46,8 +46,8 @@ class ShipControlsTests(unittest.TestCase):
         self.assertEqual(
             input_controller.calls,
             [
-                {"method": "tap", "key": "x", "modifier": None, "hold_s": 0.05},
-                {"method": "tap", "key": "x", "modifier": None, "hold_s": 0.05},
+                {"method": "tap", "key": "x", "modifier": None, "hold_s": 0.1},
+                {"method": "tap", "key": "x", "modifier": None, "hold_s": 0.1},
             ],
         )
 
@@ -60,6 +60,24 @@ class ShipControlsTests(unittest.TestCase):
 
         self.assertEqual(result.status, "missing")
         self.assertEqual(input_controller.calls, [])
+
+    def test_discrete_action_defaults_to_minimum_hold(self) -> None:
+        lookup = build_binding_lookup(
+            bindings={"SetSpeedZero": Binding(key="X")},
+            actions=["SetSpeedZero"],
+        )
+        input_controller = FakeInputController()
+        controls = ShipControls.from_binding_lookup(
+            lookup,
+            input_controller,
+            minimum_action_hold_s=0.1,
+            continuous_action_hold_s=0.2,
+        )
+
+        result = controls.set_speed_zero()
+
+        self.assertEqual(result.status, "ok")
+        self.assertEqual(input_controller.calls, [{"method": "tap", "key": "x", "modifier": None, "hold_s": 0.1}])
 
     def test_set_speed_full_dispatches_through_binding_lookup(self) -> None:
         lookup = build_binding_lookup(
@@ -90,10 +108,72 @@ class ShipControlsTests(unittest.TestCase):
         self.assertEqual(
             input_controller.calls,
             [
-                {"method": "tap", "key": "a", "modifier": None, "hold_s": 0.05},
-                {"method": "tap", "key": "a", "modifier": None, "hold_s": 0.05},
+                {"method": "tap", "key": "a", "modifier": None, "hold_s": 0.1},
+                {"method": "tap", "key": "a", "modifier": None, "hold_s": 0.1},
             ],
         )
+
+    def test_roll_left_uses_default_continuous_hold(self) -> None:
+        lookup = build_binding_lookup(
+            bindings={"RollLeftButton": Binding(key="A")},
+            actions=["RollLeftButton"],
+        )
+        input_controller = FakeInputController()
+        controls = ShipControls.from_binding_lookup(lookup, input_controller, continuous_action_hold_s=0.2)
+
+        result = controls.roll_left()
+
+        self.assertEqual(result.status, "ok")
+        self.assertEqual(input_controller.calls, [{"method": "tap", "key": "a", "modifier": None, "hold_s": 0.2}])
+
+    def test_explicit_hold_is_clamped_to_minimum_hold(self) -> None:
+        lookup = build_binding_lookup(
+            bindings={"SetSpeedZero": Binding(key="X")},
+            actions=["SetSpeedZero"],
+        )
+        input_controller = FakeInputController()
+        controls = ShipControls.from_binding_lookup(
+            lookup,
+            input_controller,
+            minimum_action_hold_s=0.1,
+            continuous_action_hold_s=0.2,
+        )
+
+        result = controls.set_speed_zero(hold_s=0.01)
+
+        self.assertEqual(result.status, "ok")
+        self.assertEqual(input_controller.calls, [{"method": "tap", "key": "x", "modifier": None, "hold_s": 0.1}])
+
+    def test_roll_left_plans_repeat_count_from_total_seconds(self) -> None:
+        lookup = build_binding_lookup(
+            bindings={"RollLeftButton": Binding(key="A")},
+            actions=["RollLeftButton"],
+        )
+        input_controller = FakeInputController()
+        controls = ShipControls.from_binding_lookup(lookup, input_controller, continuous_action_hold_s=0.2)
+
+        result = controls.roll_left(total_s=0.45)
+
+        self.assertEqual(result.status, "ok")
+        self.assertEqual(
+            input_controller.calls,
+            [
+                {"method": "tap", "key": "a", "modifier": None, "hold_s": 0.2},
+                {"method": "tap", "key": "a", "modifier": None, "hold_s": 0.2},
+                {"method": "tap", "key": "a", "modifier": None, "hold_s": 0.2},
+            ],
+        )
+
+    def test_total_seconds_is_rejected_for_discrete_actions(self) -> None:
+        lookup = build_binding_lookup(
+            bindings={"SetSpeedZero": Binding(key="X")},
+            actions=["SetSpeedZero"],
+        )
+        input_controller = FakeInputController()
+        controls = ShipControls.from_binding_lookup(lookup, input_controller, continuous_action_hold_s=0.2)
+
+        with self.assertRaisesRegex(ValueError, "total_s is only supported for continuous actions"):
+            controls.plan_action("SetSpeedZero", total_s=0.5)
 
     def test_roll_right_dispatches_through_binding_lookup(self) -> None:
         lookup = build_binding_lookup(
@@ -109,7 +189,7 @@ class ShipControlsTests(unittest.TestCase):
         self.assertEqual(result.binding.to_dict(), {"key": "d", "modifier": "left_shift"})
         self.assertEqual(
             input_controller.calls,
-            [{"method": "tap", "key": "d", "modifier": "left_shift", "hold_s": 0.0}],
+            [{"method": "tap", "key": "d", "modifier": "left_shift", "hold_s": 0.2}],
         )
 
     def test_ui_select_dispatches_through_binding_lookup(self) -> None:
@@ -126,7 +206,7 @@ class ShipControlsTests(unittest.TestCase):
         self.assertEqual(result.binding.to_dict(), {"key": "space", "modifier": None})
         self.assertEqual(
             input_controller.calls,
-            [{"method": "tap", "key": "space", "modifier": None, "hold_s": 0.0}],
+            [{"method": "tap", "key": "space", "modifier": None, "hold_s": 0.1}],
         )
 
     def test_from_bindings_file_loads_default_ship_control_actions(self) -> None:
@@ -168,11 +248,11 @@ class ShipControlsTests(unittest.TestCase):
         self.assertEqual(
             input_controller.calls,
             [
-                {"method": "tap", "key": "x", "modifier": None, "hold_s": 0.0},
-                {"method": "tap", "key": "w", "modifier": None, "hold_s": 0.0},
-                {"method": "tap", "key": "a", "modifier": None, "hold_s": 0.0},
-                {"method": "tap", "key": "d", "modifier": None, "hold_s": 0.0},
-                {"method": "tap", "key": "space", "modifier": None, "hold_s": 0.0},
+                {"method": "tap", "key": "x", "modifier": None, "hold_s": 0.1},
+                {"method": "tap", "key": "w", "modifier": None, "hold_s": 0.1},
+                {"method": "tap", "key": "a", "modifier": None, "hold_s": 0.2},
+                {"method": "tap", "key": "d", "modifier": None, "hold_s": 0.2},
+                {"method": "tap", "key": "space", "modifier": None, "hold_s": 0.1},
             ],
         )
 

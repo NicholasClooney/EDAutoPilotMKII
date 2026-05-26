@@ -7,6 +7,10 @@ bindings_file = ""
 start_hotkey = "home"
 stop_hotkey = "end"
 scanner_mode = "off"
+# Minimum dwell for any synthetic key activation.
+minimum_action_hold_seconds = 0.1
+# Default dwell used for continuous controls like roll/pitch/yaw.
+continuous_action_hold_seconds = 0.2
 
 [screen]
 resolution_width = 1920
