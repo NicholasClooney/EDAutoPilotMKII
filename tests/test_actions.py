@@ -83,4 +83,5 @@ class ActionDispatcherTests(unittest.TestCase):
             input_controller._build_modifier_clause("right_control"),
             " using {control down}",
         )
-
+        self.assertEqual(input_controller._modifier_key_code("left_shift"), 56)
+        self.assertEqual(input_controller._modifier_key_code("right_control"), 59)

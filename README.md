@@ -32,9 +32,9 @@ On the current macOS + CrossOver setup, manual testing now shows a narrower resu
 
 - synthetic key input reaches the game
 - repeated taps appear in in-game chat
-- the same tap-style path has not yet been shown to drive ship controls like `SetSpeedZero` or `RollLeftButton`
+- flight controls respond once the macOS backend sends real key-down and key-up events with a short dwell
 
-The current theory is that the macOS backend likely needs true key-down, dwell, and key-up behavior for flight controls instead of the current tap-style `keystroke` path.
+Confirmed finding: CrossOver/Elite flight controls need real key presses, not just tap-style `keystroke` delivery.
 
 ## What `diagnostics.py` Is
 

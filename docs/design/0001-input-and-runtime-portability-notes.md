@@ -118,7 +118,7 @@ Manual testing on the current macOS + CrossOver setup shows a narrower result:
 
 - synthetic tap-style input reaches the game
 - repeated taps appear in in-game chat
-- the same tap-style path has not yet been shown to drive ship controls like `SetSpeedZero` or `RollLeftButton`
+- ship controls respond once the backend sends real key-down, short dwell, and key-up events
 
 This matters most for:
 
@@ -129,7 +129,7 @@ This matters most for:
 - `RollLeftButton`
 - `RollRightButton`
 
-The result should be treated as setup-specific evidence, not a universal guarantee. More importantly, it now suggests the current backend is proving UI/text delivery, not yet reliable ship-control delivery.
+The result should be treated as setup-specific evidence, not a universal guarantee. The current confirmed requirement on this machine is real press/release timing for ship-control delivery.
 
 ### Immediate next step
 
@@ -139,7 +139,7 @@ Document backend capabilities and keep the interface level explicit:
 - repeated tap
 - press followed by delayed release
 
-The first runtime ports should not assume tap-style input is sufficient for flight controls. The current likely requirement is true key-down, short dwell, and key-up behavior in the macOS backend.
+The first runtime ports should use real key-down, short dwell, and key-up behavior in the macOS backend for flight controls.
 
 ## 3. Screen and Capture Calibration Model
 

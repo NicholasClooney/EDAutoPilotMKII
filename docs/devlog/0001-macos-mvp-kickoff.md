@@ -24,6 +24,7 @@ The following are now proven on the current macOS + CrossOver setup:
 - screen capture works
 - synthetic key delivery into the focused CrossOver Elite window works
 - repeated tap-style input reaches the game UI on this machine
+- ship controls respond once the macOS backend uses true key-down and key-up events with a short dwell
 
 The last point was first confirmed with a direct `osascript` keystroke test, then validated through `diagnostics.py` using:
 
@@ -36,8 +37,8 @@ Observed result: `jjj` arrived in the focused Elite Dangerous window.
 Later manual testing narrowed the conclusion:
 
 - repeated taps also appear in Elite chat
-- `ship_controls.py` action dispatch still did not move ship controls like `SetSpeedZero` or `RollLeftButton`
-- the likely backend gap is that `edap/platform/input/macos.py` still uses tap-style `keystroke` behavior instead of true key-down, dwell, and key-up timing
+- `ship_controls.py` action dispatch did not move ship controls while `edap/platform/input/macos.py` still used tap-style `keystroke` behavior
+- after switching the backend to real key-down, dwell, and key-up behavior, `SetSpeedZero` worked in-game
 
 ## What Is Implemented
 
@@ -65,7 +66,7 @@ Later manual testing narrowed the conclusion:
 - there is not yet a real `config.toml` in the repo root
 - the legacy autopilot loop has not been ported onto the new interfaces
 - the normalized binding lookup seam exists, but it is not yet wired into runtime actions
-- the macOS runtime input backend likely needs true press/release semantics before ship-control actions can be trusted
+- broader ship-control coverage and pacing still need validation, but the macOS runtime input backend now has the required press/release foundation
 
 ## Recommended Next Step
 

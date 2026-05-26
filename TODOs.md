@@ -23,7 +23,5 @@
 
 - Use `ship_controls.py` as the current live manual control entry point instead of `diagnostics.py`.
 - Extend it as needed for direct action testing beyond `SetSpeedZero`.
-- Current observed issue: `ship_controls.py` resolves bindings and emits expected terminal progress/JSON, but the game did not react to repeated `SetSpeedZero` or `RollLeftButton` taps when focused through CrossOver.
-- New evidence: the same synthetic key path does reach Elite chat, so macOS -> CrossOver -> game delivery works at least for text input.
-- Current theory: flight controls may need true key-down, short dwell, and key-up timing rather than the current tap-style `keystroke` behavior in `edap/platform/input/macos.py`.
-- Follow-up implementation target: add real press/release semantics in the macOS input backend and re-test `SetSpeedZero` plus one flight-axis action.
+- Confirmed on the current setup: flight controls respond when the macOS backend sends real key-down, short dwell, and key-up events.
+- Use this path as the baseline for further ship-control testing instead of the older tap-style `keystroke` behavior.
