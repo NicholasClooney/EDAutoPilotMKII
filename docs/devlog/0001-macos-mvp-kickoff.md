@@ -37,30 +37,34 @@ Observed result: `jjj` arrived in the focused Elite Dangerous window.
 ### Diagnostics foundation
 
 - config loading from TOML
+- config validation for types, supported platforms, and invalid path shapes
 - journal parsing extracted from legacy code
 - bindings parsing extracted from legacy code
 - platform path adapters for macOS and Windows
 - reusable diagnostics service layer
+- lightweight unittest coverage for config, state, bindings, and path discovery
 
 ### macOS diagnostics
 
 - CrossOver-aware journal path fallback discovery
+- broader CrossOver bindings discovery covering both `Local Settings/Application Data` and `AppData/Local`
 - screen capture diagnostic
 - native macOS input backend using `osascript`
 - delayed and repeated test key sending
+- structured reporting for configured, auto-detected, and effective paths
 
 ## Known Gaps
 
-- bindings auto-discovery is still incomplete on the current machine
 - there is not yet a real `config.toml` in the repo root
 - the legacy autopilot loop has not been ported onto the new interfaces
-- there is not yet a normalized mapping from Elite binding tokens to the macOS input backend
+- the normalized binding lookup seam exists, but it is not yet wired into runtime actions
+- we still need to verify whether flight axes require true hold semantics or whether repeated taps are sufficient
 
 ## Recommended Next Step
 
 The next agent should focus on:
 
 1. config validation and local `config.toml` workflow
-2. better CrossOver bindings discovery
-3. normalized binding-to-input mapping
+2. binding-driven runtime actions using the new lookup seam
+3. held-input verification for pitch, yaw, and roll controls
 4. porting the first real autopilot actions onto the new interfaces

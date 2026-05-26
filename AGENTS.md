@@ -15,14 +15,14 @@ Near-term work should optimize for:
 
 The immediate product goal is not a full rewrite and not a full-featured autopilot.
 
-The next engineering milestone is a diagnostic runner that proves the core runtime assumptions on macOS:
+The macOS diagnostics checkpoint is already proven for the core runtime assumptions:
 
 - journal access works
 - bindings parsing works
 - screen capture works
 - synthetic input reaches the CrossOver game window
 
-Only after those are stable should deeper autopilot behavior be reconnected.
+The current engineering focus is wiring parsed bindings and small runtime actions onto the new platform seams before attempting deeper autopilot behavior.
 
 ## Working Rules
 

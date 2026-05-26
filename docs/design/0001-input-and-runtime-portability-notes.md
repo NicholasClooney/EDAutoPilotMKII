@@ -158,6 +158,13 @@ That will be fragile on macOS because of:
 
 Make capture coordinates and template regions configurable without immediately rewriting the CV pipeline.
 
+Current practical seam:
+
+- `screen.resolution_width`, `screen.resolution_height`, and `screen.scale` remain the concrete reference dimensions
+- `screen.capture.left/top/right/bottom` defines the base normalized capture box
+- `screen.capture.regions.*` defines named normalized subregions such as `center` and `compass`
+- diagnostics reports the effective pixel layout for those regions
+
 ### Proposed direction
 
 Prefer normalized geometry as the main representation:

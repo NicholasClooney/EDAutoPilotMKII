@@ -11,20 +11,20 @@ This repository started as a Windows-focused prototype. The current direction is
 - design constraint: keep future Windows compatibility in mind
 - immediate goal: prove the platform/runtime plumbing before expanding autopilot behavior
 
-That means the next milestone is not a feature rewrite. It is a portability and diagnostics milestone.
+That means the project is still in a portability-first phase rather than a feature rewrite.
 
 ## Current Plan
 
 The active plan is documented in [docs/plans/0001-macos-mvp-portability-plan.md](docs/plans/0001-macos-mvp-portability-plan.md).
 
-In short, the next implementation target is a macOS diagnostic runner that proves:
+In short, the current checkpoint has already proven:
 
-- journal access from a configured path
-- bindings access from a configured path
+- journal access from configured or auto-detected paths
+- bindings access from configured or auto-detected paths
 - screen capture from the visible game on macOS
 - synthetic keyboard input into the CrossOver Elite Dangerous window
 
-Only after those work reliably should the full autopilot loop be reconnected.
+The current implementation focus is the seam between parsed Elite bindings and future runtime actions, followed by small action ports onto the new platform interfaces.
 
 ## What `diagnostics.py` Is
 
@@ -55,6 +55,14 @@ That code is useful as a behavior reference, but it should not be treated as the
 
 Copy `config.example.toml` to `config.toml` and fill in the journal and bindings locations if auto-detection is not sufficient. Leaving either path blank tells diagnostics to try platform auto-detection.
 
+For capture settings, the current config supports:
+
+- concrete reference dimensions via `screen.resolution_width`, `screen.resolution_height`, and `screen.scale`
+- a base capture box via `screen.capture.left/top/right/bottom`
+- named normalized subregions via `screen.capture.regions.*`
+
+The normalized capture boxes are the forward-looking seam for later CV work. The reference dimensions are still the concrete values used by diagnostics today.
+
 Then run:
 
 ```sh
@@ -74,6 +82,7 @@ Current behavior:
 - journal and bindings diagnostics are implemented
 - macOS path fallback discovery is implemented
 - diagnostics output distinguishes configured, auto-detected, and effective paths
+- diagnostics output includes the effective capture layout in normalized and pixel terms
 - screen capture diagnostic can save a debug image
 - macOS test input is wired through a native `osascript` backend for validation
 
@@ -95,6 +104,8 @@ Planned configurable items include:
 - stop hotkey
 - scanner mode
 - screen/capture scaling values
+- base capture geometry
+- named normalized subregions for future CV hooks
 
 ## Existing Runtime Assumptions
 

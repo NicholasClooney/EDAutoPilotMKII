@@ -189,6 +189,7 @@ Implemented:
 - config validation for types, supported platforms, and invalid existing path shapes
 - structured diagnostics output for configured vs auto-detected vs effective journal/bindings paths
 - broader CrossOver bindings discovery covering both `Local Settings\\Application Data` and `AppData\\Local`
+- first-pass capture calibration config with normalized base/subregion geometry and effective pixel layout reporting
 
 Proven on the current machine:
 
@@ -201,13 +202,16 @@ Still incomplete:
 
 - the legacy autopilot loop has not been migrated onto the new interfaces
 - bindings discovery still depends on a `.binds` file existing inside the active bottle layout
-- there is not yet a normalized mapping from Elite binding tokens to the macOS input backend
-- verification coverage still needs a lightweight harness for config, journal, bindings, and pure path-discovery seams
+- held flight-axis input semantics are still unverified on macOS + CrossOver
+- the normalized binding lookup seam exists, but it is not yet wired into runtime actions
+- the capture calibration seam exists, but the legacy CV pipeline has not been ported onto it yet
+- the new verification harness exists, but broader runtime and integration coverage is still needed
 
 Related open research notes:
 
 - `docs/research/0001-macos-virtual-controller-output.md`
 - `docs/research/0002-portability-open-questions.md`
+- `docs/design/0001-input-and-runtime-portability-notes.md`
 
 ## Milestone 2: Reconnect Existing Autopilot Loop
 
@@ -282,9 +286,10 @@ Mitigation:
 
 Finish the transition from diagnostics plumbing to autopilot portability:
 
-- improve CrossOver bindings discovery
-- add stronger config validation and local config workflow
-- add normalized mapping from Elite bindings to the new input backend
+- keep improving bottle-aware CrossOver path selection as needed
+- add stronger local config workflow
+- wire runtime actions through the normalized binding lookup seam
+- verify hold-versus-tap behavior for flight-axis controls
 - port the first real autopilot actions onto the new platform interfaces
 
 This is the next pickup point for the following agent.

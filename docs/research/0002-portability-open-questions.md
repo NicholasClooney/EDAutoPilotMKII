@@ -8,7 +8,7 @@ These correspond to the three earlier items that were intentionally deferred in 
 
 1. binding normalization design
 2. input semantics design
-3. screen and capture calibration model
+3. screen and capture calibration follow-up
 
 ## Recommended Home
 
@@ -83,6 +83,7 @@ How should vision regions and scaling be represented for Retina displays, CrossO
 Why this is still research:
 
 - the legacy CV code assumes a fixed 1080p-style layout
+- a first-pass config seam now exists for normalized base capture geometry and named subregions
 - the macOS diagnostic proved screen capture works, not that the old geometry assumptions are valid
 - we still need real screenshots and template-match feedback before choosing a durable calibration model
 
