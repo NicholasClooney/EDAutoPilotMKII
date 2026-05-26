@@ -206,6 +206,19 @@ Reasonable next additions if needed:
 - dry-run binding resolution
 - explicit `tap`, `press`, and `release` modes
 
+Current useful sequence semantics:
+
+- semicolon-separated action sequences
+- per-step `repeat=`, `hold=`, `total=`, and `delay=`
+
+Manual testing guideline:
+
+- contradictory actions should not be scheduled back-to-back without a gap if the goal is to observe their effect
+- examples:
+  - `SetSpeedZero -> SetSpeed100 -> SetSpeedZero`
+  - `RollLeftButton -> RollRightButton -> RollLeftButton`
+- prefer explicit per-step `delay=` when building those test sequences
+
 ## 3. Screen and Capture Calibration Model
 
 ### Problem

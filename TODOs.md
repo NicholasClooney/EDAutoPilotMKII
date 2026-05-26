@@ -42,6 +42,10 @@
 - Keep `ship_controls.py` as the human test surface for live in-game control testing.
 - Add only the smallest features that materially improve manual verification loops.
 - Avoid turning it into a second app, console, or long-term runtime surface.
+- Current useful features:
+  - action sequences
+  - per-step `delay=`
+  - global or per-step hold/total planning
 - Good future candidates: `--interval-seconds`, `--dry-run`, and explicit `tap|press|release` mode selection.
 
 ### Control timing policy
@@ -65,3 +69,9 @@
   - apply dwell timing defaults for continuous controls in a higher-level policy layer
   - keep those defaults configurable in config
   - if a routine needs total actuation time `t`, dispatch `ceil(t / dwell)` activations using the configured dwell
+- Manual testing guideline:
+  - when generating test sequences with contradictory actions, leave time between them so the effect is observable
+  - examples:
+    - `SetSpeedZero -> SetSpeed100 -> SetSpeedZero`
+    - `RollLeftButton -> RollRightButton -> RollLeftButton`
+  - in practice, prefer explicit per-step `delay=` between those actions
