@@ -4,7 +4,7 @@ import argparse
 import json
 import sys
 
-from edap.config import DEFAULT_CONFIG_PATH, EXAMPLE_CONFIG_PATH, load_config
+from edap.config import ConfigError, DEFAULT_CONFIG_PATH, EXAMPLE_CONFIG_PATH, load_config
 from edap.diagnostics import DiagnosticsOptions, run_diagnostics
 
 
@@ -70,6 +70,9 @@ def main() -> int:
                 f"Create `config.toml` from `config.example.toml`, or pass `--config /path/to/config.toml`.\n"
             )
             return 2
+    except ConfigError as exc:
+        sys.stderr.write(f"Invalid config: {exc}\n")
+        return 2
     options = DiagnosticsOptions(
         capture_screen=args.capture_screen,
         send_test_key=args.send_test_key,
