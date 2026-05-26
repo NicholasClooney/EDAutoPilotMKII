@@ -108,7 +108,7 @@ On macOS, synthetic input and screen capture may require Accessibility or Screen
 
 ## Manual Utility Scripts
 
-Beyond `diagnostics.py`, two scripts are useful for poking at bindings and exercising single controls. Both honor the same `--config` flag and reuse the shared runtime context.
+Beyond `diagnostics.py`, three scripts are useful for poking at bindings and exercising single controls. All honor the same `--config` flag and reuse the shared runtime context.
 
 ### `check_bindings.py`
 
@@ -140,6 +140,22 @@ python3 ship_controls.py --delay-seconds 3 --sequence "SetSpeedZero; RollLeftBut
 Per-step fields inside `--sequence` are `repeat=<n> hold=<seconds> total=<seconds> delay=<seconds>`. `total=` is only valid for continuous controls (roll, yaw, pitch) and plans the number of repeated activations from the requested total actuation time. `delay=` pauses before the step so the game window can stay focused between effects.
 
 Plain bindings and modifier-combo bindings (`Ctrl+...` etc.) both work through the Quartz `CGEvent` backend. The earlier osascript-only quirks around `.` (`Key_Period`) and modifier combos are resolved.
+
+### `set_binding.py`
+
+Programmatically edits the `.binds` XML file, intended for agent-driven binding changes rather than navigating the in-game menu. Writes a `.bak` alongside the bindings file by default.
+
+```sh
+python3 set_binding.py PitchDownButton --show
+python3 set_binding.py PitchDownButton --key i
+python3 set_binding.py SetSpeedZero --key x --modifier ctrl
+python3 set_binding.py PitchDownButton --slot secondary --key q
+python3 set_binding.py PitchDownButton --clear
+```
+
+`--show` is read-only. `--key` accepts internal canonical names: letters (`a`-`z`), digits, punctuation literals (`. , [ ] / \ ; ' - =`), specials (`space`, `enter`, `tab`, `escape`, `backspace`, `delete`, `home`, `end`, `page_up`, `page_down`, arrows), modifier-as-key names (`left_shift`, `right_control`, ...), `numpad_<0-9>`, and `f<1-20>`. `--modifier` accepts the same modifier names plus the aliases `shift`, `ctrl`, `alt`. `--slot` is `primary` (default) or `secondary`. `--clear` empties the slot.
+
+Changes take effect when Elite Dangerous next reads the bindings file. The game generally re-reads on launch and when entering the Controls menu, so close and reopen ED after a write to be safe.
 
 ## Configuration Direction
 
