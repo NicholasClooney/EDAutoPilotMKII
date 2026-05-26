@@ -186,6 +186,9 @@ Implemented:
 - macOS screen capture diagnostic
 - macOS native input diagnostic through `osascript`
 - `diagnostics.py` CLI with delay/repeat support for test keys
+- config validation for types, supported platforms, and invalid existing path shapes
+- structured diagnostics output for configured vs auto-detected vs effective journal/bindings paths
+- broader CrossOver bindings discovery covering both `Local Settings\\Application Data` and `AppData\\Local`
 
 Proven on the current machine:
 
@@ -196,9 +199,15 @@ Proven on the current machine:
 
 Still incomplete:
 
-- bindings auto-detection is not yet reliable on the current machine
-- config validation is still minimal
 - the legacy autopilot loop has not been migrated onto the new interfaces
+- bindings discovery still depends on a `.binds` file existing inside the active bottle layout
+- there is not yet a normalized mapping from Elite binding tokens to the macOS input backend
+- verification coverage still needs a lightweight harness for config, journal, bindings, and pure path-discovery seams
+
+Related open research notes:
+
+- `docs/research/0001-macos-virtual-controller-output.md`
+- `docs/research/0002-portability-open-questions.md`
 
 ## Milestone 2: Reconnect Existing Autopilot Loop
 
