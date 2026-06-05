@@ -36,6 +36,8 @@ State transitions are driven by journal events: `StartJump` + `JumpType` -> `sta
   - Sensors: journal-derived star class and fuel percent.
   - Condition: fuel < 33% AND star class in `{F, O, G, K, B, A, M}`.
   - Actuates `SetSpeed100` -> `SetSpeedZero` x3, then polls journal until `FuelLevel == FuelCapacity`.
+  - Legacy sequence detail: the old routine assumes the ship is already in supercruise at a scoopable star, sends `SetSpeed100`, waits 4 seconds, sends `SetSpeedZero` three times, then waits until fuel reaches 100%.
+  - Legacy safety note: there is no heat guard, no distance/proximity guard, no "did scooping actually start?" check, and no timeout in the original implementation.
 - **Position / Scan** (`dev_autopilot.py:1227-1253`). Reposition and trigger discovery scanner between jumps.
   - Sensors: scanner state (held in tray UI state), sun brightness.
   - Actuates `PrimaryFire` or `SecondaryFire` hold, pitch up, set speed 100, more pitch up, then waits until sun < 3% (or 5-20s depending on whether a refuel happened).

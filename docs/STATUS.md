@@ -23,6 +23,12 @@ The first journal-driven runtime pieces now exist:
 - `run_routine.py` now supports both `auto_zero_throttle_on_arrival` and `jump` as live manual harnesses for exercising journal-driven paths against a real Elite session.
 - The current live manual test flows for those harnesses are documented in `docs/manual-journal-routine-testing.md`.
 
+Latest live validation on the current macOS + CrossOver setup:
+
+- raw key injection through `diagnostics.py --send-test-key` was re-validated after restoring macOS Accessibility permission for the terminal app
+- `watch_journal.py` confirmed live journal tailing and the expected event vocabulary
+- `run_routine.py --routine jump --log-events` captured the expected hyperspace sequence: `StartJump` with `JumpType == "Hyperspace"` followed by `FSDJump`
+
 The important caveat is that the real autopilot loop is still largely unported. The project is in a portability-first and runtime-seams phase, not a "macOS autopilot feature complete" phase.
 
 ## Port Status
@@ -41,9 +47,10 @@ The important caveat is that the real autopilot loop is still largely unported. 
 | Journal watcher | Done | `edap/state.py` — incremental tailing with rollover support and tests |
 | Auto-zero throttle on arrival | Done | `edap/routines.py` — dispatches `SetSpeedZero` on `SupercruiseExit` |
 | Jump sequencing | Done | `edap/routines.py` — retrying journal-driven routine with start/completion timeouts and throttle-zero follow-up |
-| Refuel sequencing | Stub | State reads exist; scoop sequence not wired |
+| Refuel sequencing | Deferred | Legacy behavior is understood, but implementation is intentionally paused for now |
 | Dock sequencing | Stub | Needs UI menu walk plus status waits |
 | Undock sequencing | Stub | Needs UI menu walk plus status waits |
+| Station / docked state detection | Partial | `edap/state.py` derives coarse statuses like `in_station`, `starting_docking`, and `in_docking`, but there is no dedicated docked/station snapshot model yet |
 | Hotkey registration | Parked | `keyboard` lib doesn't work on macOS; likely future direction is a menu-bar app |
 | Legacy autopilot loop migration | Not ported | `dev_autopilot.py` remains the behavior reference; new `edap/` routines are still minimal |
 
@@ -66,6 +73,7 @@ Full detail: `docs/research/0004-legacy-autopilot-port-status.md`.
 
 Plans 0002 and 0003 are independent and can run in parallel.
 
-- Next task in 0003: `refuel` — next journal-driven routine after watcher, arrival throttle, and jump.
+- Next task in 0003: investigate and tighten station / docked-state detection before choosing the next routine.
+- `refuel` is intentionally deferred for now.
 - First task in 0002: `scratch_cv.py` — answers whether legacy templates match macOS + CrossOver captures before any align work is attempted.
 - Then: use plan 0004 to measure capture-loop performance and journal latency once the first CV probe or first journal routine exists.
