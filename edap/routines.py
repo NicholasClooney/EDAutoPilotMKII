@@ -34,6 +34,20 @@ class SupportsStationMenuControls(Protocol):
         """Dispatch the UI_Down action."""
 
 
+class SupportsUndockControls(Protocol):
+    def ui_back(self, repeat: int = 1, hold_s: float = 0.0) -> ActionDispatchResult:
+        """Dispatch the UI_Back action."""
+
+    def head_look_reset(self, repeat: int = 1, hold_s: float = 0.0) -> ActionDispatchResult:
+        """Dispatch the HeadLookReset action."""
+
+    def ui_down(self, repeat: int = 1, hold_s: float = 0.0) -> ActionDispatchResult:
+        """Dispatch the UI_Down action."""
+
+    def ui_select(self, repeat: int = 1, hold_s: float = 0.0) -> ActionDispatchResult:
+        """Dispatch the UI_Select action."""
+
+
 class SupportsDockingControls(SupportsStationMenuControls, SupportsSetSpeedZero, Protocol):
     def boost(self, repeat: int = 1, hold_s: float = 0.0) -> ActionDispatchResult:
         """Dispatch the BoostButton action."""
@@ -568,3 +582,98 @@ def docking_request_sequence(
 
 def _is_docked_event(event: dict[str, object]) -> bool:
     return event.get("event") == "Docked"
+
+
+def _is_undocked_event(event: dict[str, object]) -> bool:
+    return event.get("event") == "Undocked"
+
+
+def undock(
+    controls: SupportsUndockControls,
+    watcher: SupportsPollEvents,
+    *,
+    undock_timeout_s: float = 30.0,
+    step_delay_s: float = 0.3,
+    time_fn: Callable[[], float] = monotonic,
+    sleeper: Callable[[float], None] = sleep,
+    progress_fn: Callable[[str], None] | None = None,
+) -> RoutineResult:
+    if undock_timeout_s < 0:
+        raise ValueError("undock_timeout_s must be non-negative")
+    if step_delay_s < 0:
+        raise ValueError("step_delay_s must be non-negative")
+
+    if progress_fn is not None:
+        progress_fn("Resetting UI state...")
+    dispatch = controls.ui_back(repeat=10)
+    if dispatch.status != "ok":
+        return RoutineResult(
+            action="UI_Back",
+            dispatch=dispatch,
+            details={"phase": "reset"},
+        )
+    if step_delay_s > 0:
+        sleeper(step_delay_s)
+
+    dispatch = controls.head_look_reset()
+    if dispatch.status != "ok":
+        return RoutineResult(
+            action="HeadLookReset",
+            dispatch=dispatch,
+            details={"phase": "reset"},
+        )
+    if step_delay_s > 0:
+        sleeper(step_delay_s)
+
+    if progress_fn is not None:
+        progress_fn("Navigating to Launch...")
+    dispatch = controls.ui_down()
+    if dispatch.status != "ok":
+        return RoutineResult(
+            action="UI_Down",
+            dispatch=dispatch,
+            details={"phase": "navigate"},
+        )
+    if step_delay_s > 0:
+        sleeper(step_delay_s)
+
+    launch_dispatch = controls.ui_select()
+    if launch_dispatch.status != "ok":
+        return RoutineResult(
+            action="UI_Select",
+            dispatch=launch_dispatch,
+            details={"phase": "launch"},
+        )
+
+    # Prime the watcher before waiting so events written during the menu walk
+    # are not missed on the first poll.
+    watcher.poll()
+
+    if progress_fn is not None:
+        progress_fn(f"Waiting for Undocked (timeout {undock_timeout_s:.0f}s)...")
+    undocked_event = _wait_for_event(
+        watcher,
+        predicate=_is_undocked_event,
+        deadline=time_fn() + undock_timeout_s,
+        time_fn=time_fn,
+    )
+    if undocked_event is None:
+        return RoutineResult(
+            action="UI_Select",
+            dispatch=ActionDispatchResult(
+                action="UI_Select",
+                status="error",
+                reason=f"Undocked event was not observed within {undock_timeout_s:.0f}s — menu walk may have missed Launch",
+            ),
+            details={"phase": "wait_for_undocked", "undock_timeout_s": undock_timeout_s},
+        )
+
+    if progress_fn is not None:
+        station = undocked_event.get("StationName", "")
+        progress_fn(f"Undocked: {station}" if station else "Undocked")
+    return RoutineResult(
+        action="Undocked",
+        dispatch=launch_dispatch,
+        trigger_event=undocked_event,
+        details={"phase": "complete"},
+    )

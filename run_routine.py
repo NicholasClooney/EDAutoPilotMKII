@@ -9,7 +9,7 @@ from time import sleep
 
 from edap.binding_lookup import BindingLookup
 from edap.config import ConfigError, DEFAULT_CONFIG_PATH
-from edap.routines import auto_zero_throttle_on_arrival, dock, jump, station_refuel_menu
+from edap.routines import auto_zero_throttle_on_arrival, dock, jump, station_refuel_menu, undock
 from edap.runtime import build_runtime_context, load_config_with_fallback
 from edap.ship_controls import ShipControls
 from edap.state import JournalWatcher
@@ -19,7 +19,8 @@ ROUTINE_AUTO_ZERO_THROTTLE_ON_ARRIVAL = "auto_zero_throttle_on_arrival"
 ROUTINE_JUMP = "jump"
 ROUTINE_DOCK = "dock"
 ROUTINE_STATION_REFUEL_MENU = "station_refuel_menu"
-SUPPORTED_ROUTINES = [ROUTINE_AUTO_ZERO_THROTTLE_ON_ARRIVAL, ROUTINE_JUMP, ROUTINE_DOCK, ROUTINE_STATION_REFUEL_MENU]
+ROUTINE_UNDOCK = "undock"
+SUPPORTED_ROUTINES = [ROUTINE_AUTO_ZERO_THROTTLE_ON_ARRIVAL, ROUTINE_JUMP, ROUTINE_DOCK, ROUTINE_STATION_REFUEL_MENU, ROUTINE_UNDOCK]
 DEFAULT_EVENT_LOG_PATH = Path("artifacts/run-routine-events.log")
 
 
@@ -148,6 +149,10 @@ class ProgressShipControls:
         self._log("UI_Down", repeat)
         return self._controls.ui_down(repeat=repeat, hold_s=hold_s)
 
+    def head_look_reset(self, repeat: int = 1, hold_s: float | None = None):
+        self._log("HeadLookReset", repeat)
+        return self._controls.head_look_reset(repeat=repeat, hold_s=hold_s)
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run a journal-driven routine")
@@ -251,6 +256,12 @@ def main() -> int:
         help="Seconds to wait after DockingDenied before retrying the dock request",
     )
     parser.add_argument(
+        "--undock-timeout-seconds",
+        type=float,
+        default=30.0,
+        help="Maximum time to wait for Undocked event after sending the launch command",
+    )
+    parser.add_argument(
         "--log-events",
         action="store_true",
         help="Log all watched journal events to a file while the routine runs",
@@ -315,6 +326,9 @@ def main() -> int:
     if args.deny_retry_delay_seconds < 0:
         sys.stderr.write("Invalid routine request: --deny-retry-delay-seconds must be non-negative\n")
         return 2
+    if args.undock_timeout_seconds < 0:
+        sys.stderr.write("Invalid routine request: --undock-timeout-seconds must be non-negative\n")
+        return 2
 
     routine_actions = ["SetSpeedZero"]
     if args.routine == ROUTINE_JUMP:
@@ -335,6 +349,8 @@ def main() -> int:
         ]
     elif args.routine == ROUTINE_STATION_REFUEL_MENU:
         routine_actions = ["UI_Up", "UI_Select", "UI_Down"]
+    elif args.routine == ROUTINE_UNDOCK:
+        routine_actions = ["UI_Back", "HeadLookReset", "UI_Down", "UI_Select"]
 
     runtime = build_runtime_context(loaded.config, actions=routine_actions)
     journal_dir = runtime.journal.effective_path
@@ -344,6 +360,7 @@ def main() -> int:
         ROUTINE_JUMP,
         ROUTINE_DOCK,
         ROUTINE_STATION_REFUEL_MENU,
+        ROUTINE_UNDOCK,
     }
     if routine_needs_journal and journal_dir is None:
         sys.stderr.write(
@@ -400,6 +417,8 @@ def main() -> int:
             watch_target = "approach and docking events"
         elif args.routine == ROUTINE_STATION_REFUEL_MENU:
             watch_target = "Docked events"
+        elif args.routine == ROUTINE_UNDOCK:
+            watch_target = "Undocked events"
         _progress(
             f"Watching {journal_dir} for {watch_target} "
             f"(poll {args.poll_interval_seconds:.2f}s)."
@@ -433,6 +452,9 @@ def main() -> int:
         _progress(f"  {_describe_binding(runtime.binding_lookup, 'UI_Up')}")
         _progress(f"  {_describe_binding(runtime.binding_lookup, 'UI_Select')}")
         _progress(f"  {_describe_binding(runtime.binding_lookup, 'UI_Down')}")
+    elif args.routine == ROUTINE_UNDOCK:
+        for action in ["UI_Back", "HeadLookReset", "UI_Down", "UI_Select"]:
+            _progress(f"  {_describe_binding(runtime.binding_lookup, action)}")
 
     try:
         if args.routine == ROUTINE_AUTO_ZERO_THROTTLE_ON_ARRIVAL:
@@ -475,6 +497,15 @@ def main() -> int:
                 watcher,
                 dock_timeout_s=args.dock_timeout_seconds,
                 settle_s=args.settle_seconds,
+                sleeper=logging_sleeper,
+                progress_fn=_progress,
+            )
+        elif args.routine == ROUTINE_UNDOCK:
+            result = undock(
+                logging_controls,
+                watcher,
+                undock_timeout_s=args.undock_timeout_seconds,
+                step_delay_s=step_delay_seconds,
                 sleeper=logging_sleeper,
                 progress_fn=_progress,
             )

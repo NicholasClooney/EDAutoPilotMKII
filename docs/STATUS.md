@@ -2,7 +2,7 @@
 
 _This is the maintained status document for the repo. Update it at the end of each session when project understanding, port status, or next steps change. Keep it current over time rather than treating it as a frozen checkpoint._
 
-Last updated: 2026-06-05
+Last updated: 2026-06-05 (session 2)
 
 ## Where We Are
 
@@ -21,7 +21,9 @@ The first journal-driven runtime pieces now exist:
 - `auto_zero_throttle_on_arrival` exists as the first watcher-to-controls routine and dispatches `SetSpeedZero` on `SupercruiseExit`.
 - `jump` now exists as the first retrying journal-driven routine. It dispatches `HyperSuperCombination`, waits for `StartJump` / hyperspace start, then waits to re-enter `in_supercruise` and zeroes throttle.
 - `dock` now exists as a journal-driven station approach routine. It can wait for `SupercruiseExit`, send the legacy docking-request menu walk, wait for docking journal events, and optionally chain the in-station refuel menu.
-- `run_routine.py` now supports `auto_zero_throttle_on_arrival`, `jump`, `dock`, and `station_refuel_menu` as live manual harnesses for exercising journal-driven paths against a real Elite session.
+- `undock` now exists as a journal-driven routine. It sends `UI_Back x10`, `HeadLookReset`, a single `UI_Down` tap, and `UI_Select` to trigger launch, then polls for the `Undocked` journal event (configurable timeout, default 30s). The legacy `SetSpeedZero` calls between launch confirm and undock completion were dropped — the ship is still in the docking bay at that point and throttle state is irrelevant. Discrepancy noted in `docs/plans/0003-journal-driven-routines.md`.
+- `run_routine.py` now supports `auto_zero_throttle_on_arrival`, `jump`, `dock`, `station_refuel_menu`, and `undock` as live manual harnesses for exercising journal-driven paths against a real Elite session.
+- `run_routine.py` now emits live progress to stderr (waiting-for-event, event-detected, key-presses, pauses). JSON output is opt-in via `--json`.
 - The current live manual test flows for those harnesses are documented in `docs/manual-journal-routine-testing.md`.
 
 Latest live validation on the current macOS + CrossOver setup:
@@ -30,6 +32,7 @@ Latest live validation on the current macOS + CrossOver setup:
 - `watch_journal.py` confirmed live journal tailing and the expected event vocabulary
 - `run_routine.py --routine jump --log-events` captured the expected hyperspace sequence: `StartJump` with `JumpType == "Hyperspace"` followed by `FSDJump`
 - `run_routine.py --routine dock --skip-supercruise-exit --auto-refuel --log-events` completed a full dock-and-refuel cycle; live testing revealed a retry-after-grant bug (watcher offset primed too late when supercruise wait is skipped) which was fixed in `edap/routines.py`
+- Dock routine was further extended (not yet live-validated): boost after SupercruiseExit with configurable settle time, DockingDenied retry loop with configurable delay, `ui_left` after `ui_select` to dismiss the station contact menu
 
 The important caveat is that the real autopilot loop is still largely unported. The project is in a portability-first and runtime-seams phase, not a "macOS autopilot feature complete" phase.
 
@@ -50,15 +53,15 @@ The important caveat is that the real autopilot loop is still largely unported. 
 | Auto-zero throttle on arrival | Done | `edap/routines.py` — dispatches `SetSpeedZero` on `SupercruiseExit` |
 | Jump sequencing | Done | `edap/routines.py` — retrying journal-driven routine with start/completion timeouts and throttle-zero follow-up |
 | Refuel sequencing | Deferred | Legacy behavior is understood, but implementation is intentionally paused for now |
-| Dock sequencing | Done | `edap/routines.py` — waits on journal events, drives legacy-style docking request UI walk, optionally chains station refuel menu |
-| Undock sequencing | Stub | Needs UI menu walk plus status waits |
+| Dock sequencing | Done | `edap/routines.py` — waits on journal events, boosts after SCX and settles, drives legacy-style docking request UI walk (with `ui_left` to exit contacts menu), retries after DockingDenied with configurable delay, optionally chains station refuel menu |
+| Undock sequencing | Done | `edap/routines.py` — menu walk (UI_Back x10, HeadLookReset, UI_Down, UI_Select), polls for `Undocked` event; not yet live-validated |
 | Station / docked state detection | Partial | `edap/state.py` derives coarse statuses like `in_station`, `starting_docking`, and `in_docking`, but there is no dedicated docked/station snapshot model yet |
 | Hotkey registration | Parked | `keyboard` lib doesn't work on macOS; likely future direction is a menu-bar app |
 | Legacy autopilot loop migration | Not ported | `dev_autopilot.py` remains the behavior reference; new `edap/` routines are still minimal |
 
 ## Unverified on macOS / CrossOver
 
-- **CV templates on Retina + CrossOver.** Templates were authored against 1080p Windows captures. Nothing has run `cv2.matchTemplate` against a live CrossOver window on this machine yet.
+- **CV templates on Retina + CrossOver.** `scratch_cv.py` has been run against a live CrossOver session. Navpoint passed (0.59 vs 0.5 threshold). Compass near-missed (0.29 vs 0.3 threshold) — template needs re-baking from a frame captured on this machine. Destination was 0.0 as expected (ship was not in supercruise with a target locked). Compass re-bake is the next CV task.
 - **Real-time capture loop.** Only ever captured a single frame. Frame rate and capture cost in a continuous loop are unmeasured.
 - **Journal write latency vs poll rate.** We have not measured how quickly Elite (through CrossOver) flushes events to disk relative to a 0.5s poll.
 - **Window focus during autopilot.** `CGEventPost` is global on macOS; behavior across focus loss and multi-monitor setups during a live run is untested.
@@ -75,7 +78,8 @@ Full detail: `docs/research/0004-legacy-autopilot-port-status.md`.
 
 Plans 0002 and 0003 are independent and can run in parallel.
 
-- Next task in 0003: dock routine is live-validated. Decide whether to implement `undock` or tighten station-state modeling next.
+- Next task in 0003: `undock` is implemented but not yet live-validated. Run `python3 run_routine.py --config config.toml --routine undock --log-events` from a docked state.
 - `refuel` is intentionally deferred for now.
-- First task in 0002: `scratch_cv.py` — answers whether legacy templates match macOS + CrossOver captures before any align work is attempted.
-- Then: use plan 0004 to measure capture-loop performance and journal latency once the first CV probe or first journal routine exists.
+- Next task in 0002: re-bake `templates/compass.png` from a live capture. Run `uv run python3 scratch_cv.py --config config.toml --save-raw /tmp/cv-raw.png`, then crop the compass from the raw frame.
+- Destination template needs a supercruise test before deciding whether it also needs re-baking.
+- Then: use plan 0004 to measure capture-loop performance and journal latency.

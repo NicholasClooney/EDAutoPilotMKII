@@ -37,7 +37,7 @@ Add one routine at a time, each modelled on its legacy counterpart but driven by
 2. `jump(controls, watcher)` — mirror `dev_autopilot.py:1128-1154`. Dispatch `HyperSuperCombination` with a held tap, wait for `starting_hyperspace` → `in_supercruise`, retry up to 3 times. No align fallback yet (that needs CV).
 3. `refuel(controls, watcher, threshold_percent=33)` — mirror `dev_autopilot.py:1169-1196`. Trigger when fuel% < threshold AND star class in `{F, O, G, K, B, A, M}`. Dispatch the `SetSpeed100` → `SetSpeedZero` x3 sequence, then poll the watcher until `FuelLevel == FuelCapacity` or a timeout fires.
 4. `dock(controls, watcher)` — mirror `dev_autopilot.py:955-992`. Drive the UI menu walk: `UIFocus`, `UI_Left`, `UI_Up`, `UI_Select`, etc. Wait on the journal transition `starting_docking` → `in_docking` → `in_station`. Retry the menu walk on timeout.
-5. `undock(controls, watcher)` — mirror `dev_autopilot.py:916-940`. Drive the undock menu walk. Wait on `in_undocking` → `in_space`.
+5. `undock(controls, watcher)` — drive the undock menu walk. Wait on `in_undocking` → `in_space`. See discrepancy note below.
 
 All routines should follow the existing `RoutineResult` shape (or extend it) so that a CLI can report what was done.
 
@@ -60,7 +60,7 @@ Out of scope:
 
 - Legacy:
   - `dev_autopilot.py:151-248` — `ship()`, the event vocabulary the watcher should match.
-  - `dev_autopilot.py:916-940` — `undock`.
+  - `dev_autopilot.py:916-940` — `undock`. **Discrepancy:** the legacy code sends `SetSpeedZero x2` between the launch confirm and the `in_space` wait (lines 929-930). The ship is still in the docking bay at that point so zeroing throttle has no meaningful effect. The new implementation omits this step. If testing reveals the game requires the throttle to be low before undocking completes, revisit.
   - `dev_autopilot.py:955-992` — `dock`.
   - `dev_autopilot.py:1128-1154` — `jump`.
   - `dev_autopilot.py:1169-1196` — `refuel`.
