@@ -13,42 +13,15 @@ This repository started as a Windows-focused prototype. The current direction is
 
 That means the project is still in a portability-first phase rather than a feature rewrite.
 
-## Current Plan
+## Current Status
 
-The active plan is documented in [docs/plans/0001-macos-mvp-portability-plan.md](docs/plans/0001-macos-mvp-portability-plan.md).
+See [docs/STATUS.md](docs/STATUS.md) for port status, what is stubbed, what is unverified, and which plan to pick up next.
 
-Follow-up work is split across three smaller plans:
+Active plans:
 
-- [docs/plans/0002-cv-pipeline-scaffold.md](docs/plans/0002-cv-pipeline-scaffold.md) — probe whether the legacy compass/navpoint/destination templates match on macOS + CrossOver.
+- [docs/plans/0002-cv-pipeline-scaffold.md](docs/plans/0002-cv-pipeline-scaffold.md) — probe whether legacy CV templates match on macOS + CrossOver.
 - [docs/plans/0003-journal-driven-routines.md](docs/plans/0003-journal-driven-routines.md) — `JournalWatcher`, `jump`, `refuel`, `dock`, `undock`, `auto_zero_throttle_on_arrival`, plus a `run_routine.py` CLI.
 - [docs/plans/0004-runtime-diagnostics-dashboard.md](docs/plans/0004-runtime-diagnostics-dashboard.md) — capture benchmark, journal-latency probe, and a `rich.live` stats-for-nerds dashboard.
-
-The legacy-to-port mapping that motivates the plans lives in [docs/research/0004-legacy-autopilot-port-status.md](docs/research/0004-legacy-autopilot-port-status.md).
-
-In short, the current checkpoint has already proven:
-
-- journal access from configured or auto-detected paths
-- bindings access from configured or auto-detected paths
-- screen capture from the visible game on macOS
-- synthetic keyboard input into the CrossOver Elite Dangerous window
-
-The current implementation focus is the seam between parsed Elite bindings and future runtime actions, using a shared runtime context plus small action ports onto the new platform interfaces.
-
-On the current macOS + CrossOver setup, manual testing now shows a narrower result:
-
-- synthetic key input reaches the game
-- repeated taps appear in in-game chat
-- flight controls respond once the macOS backend sends real key-down and key-up events with a short dwell
-- plain and modifier-combo ship controls both work through the macOS input backend
-- `.` (`Key_Period`) and similar osascript-broken keys now route correctly because the backend posts Quartz `CGEvent` keyboard events directly instead of going through `osascript` / `System Events`
-
-Confirmed finding: CrossOver/Elite flight controls need real key presses delivered through `CGEventPost`. The earlier `osascript` backend was reliable for letters but had two dead-ends (the `.` → `PitchDownButton` quirk and unresolved `Ctrl+...` modifier combos) that CGEvent fixes.
-
-Current control-timing policy:
-
-- all actions have a minimum dwell floor of `0.1s`
-- continuous controls default to `0.2s`
-- continuous controls can also be driven by total requested actuation time
 
 ## What `diagnostics.py` Is
 
@@ -56,24 +29,16 @@ Current control-timing policy:
 
 It is a small command or mode that validates core prerequisites without attempting to fly the ship. For this project, that means checking config, journal parsing, bindings parsing, screen capture, and test input delivery.
 
-## Current State
+## Legacy Code
 
-The existing codebase still contains the original Windows-oriented implementation:
+The original Windows-oriented implementation is still present as a behavior reference:
 
-- `autopilot.py` starts the legacy app flow
-- `dev_tray.py` contains tray and hotkey behavior
-- `dev_autopilot.py` contains most of the current logic
-- `src/directinput.py` is Windows-specific input code
+- `autopilot.py` — legacy app entry point
+- `dev_tray.py` — tray and hotkey behavior
+- `dev_autopilot.py` — most of the original logic
+- `src/directinput.py` — Windows-specific input code
 
-That code is useful as a behavior reference, but it should not be treated as the final structure for the macOS-first version.
-
-## Near-Term Goals
-
-- introduce explicit config for paths and hotkeys
-- extract journal and bindings parsing into reusable modules
-- isolate platform-specific input, paths, hotkeys, and screen capture
-- build the macOS diagnostic runner
-- reconnect autopilot logic only after diagnostics are stable
+Do not treat these as the target structure for the macOS-first version.
 
 ## Diagnostics Usage
 
@@ -162,25 +127,6 @@ python3 set_binding.py PitchDownButton --clear
 `--show` is read-only. `--key` accepts internal canonical names: letters (`a`-`z`), digits, punctuation literals (`. , [ ] / \ ; ' - =`), specials (`space`, `enter`, `tab`, `escape`, `backspace`, `delete`, `home`, `end`, `page_up`, `page_down`, arrows), modifier-as-key names (`left_shift`, `right_control`, ...), `numpad_<0-9>`, and `f<1-20>`. `--modifier` accepts the same modifier names plus the aliases `shift`, `ctrl`, `alt`. `--slot` is `primary` (default) or `secondary`. `--clear` empties the slot.
 
 Changes take effect when Elite Dangerous next reads the bindings file. The game generally re-reads on launch and when entering the Controls menu, so close and reopen ED after a write to be safe.
-
-## Configuration Direction
-
-The project is moving away from hardcoded assumptions such as:
-
-- Windows journal locations
-- Windows bindings locations
-- fixed start/stop shortcuts
-
-Planned configurable items include:
-
-- journal directory
-- bindings file
-- start hotkey
-- stop hotkey
-- scanner mode
-- screen/capture scaling values
-- base capture geometry
-- named normalized subregions for future CV hooks
 
 ## Existing Runtime Assumptions
 

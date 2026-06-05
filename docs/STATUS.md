@@ -1,0 +1,62 @@
+# Project Status
+
+_This is the maintained status document for the repo. Update it at the end of each session when project understanding, port status, or next steps change. Keep it current over time rather than treating it as a frozen checkpoint._
+
+Last updated: 2026-06-05
+
+## Where We Are
+
+Plan 0001 (macOS MVP portability) is complete. The four hard platform problems are proven on the current macOS + CrossOver setup:
+
+- Journal auto-detection and parsing works against a real log.
+- Bindings XML parsing and action lookup works.
+- Screen capture from the CrossOver window works.
+- Synthetic key input via Quartz `CGEventPost` reaches the game, including modifier combos and punctuation keys that broke the earlier `osascript` backend.
+
+A shared runtime context, config system, bindings lookup seam, and a small runtime action surface are wired up. Utility scripts `diagnostics.py`, `ship_controls.py`, `check_bindings.py`, `set_binding.py`, and `view_bindings.py` all work.
+
+The important caveat is that the real autopilot loop is still largely unported. The project is in a portability-first and runtime-seams phase, not a "macOS autopilot feature complete" phase.
+
+## Port Status
+
+| Capability | Status | Notes |
+| --- | --- | --- |
+| Journal parsing | Done | `edap/state.py` — tested against real journals |
+| Bindings XML parsing | Done | `edap/bindings.py`, `edap/binding_lookup.py` |
+| Action dispatch | Done | `edap/actions.py`, `edap/ship_controls.py` — 0.1s dwell floor, 0.2s continuous default |
+| macOS input backend | Done | `edap/platform/input/macos.py` — Quartz CGEvent, modifier combos work |
+| Screen capture (one-shot) | Done | `edap/platform/screen/macos.py`, `edap/capture.py` — normalized regions |
+| Config loading | Done | `edap/config.py`, `config.example.toml` |
+| Runtime context assembly | Done | `edap/runtime.py` — config fallback, path resolution, optional binding lookup, platform adapter wiring |
+| CV pipeline (compass, navpoint, destination) | Not ported | No template matching in `edap/` yet — blocked on plan 0002 |
+| Align loop | Not ported | Depends on CV pipeline |
+| Journal watcher | Not ported | No incremental `JournalWatcher` yet; current state reads are on-demand snapshots |
+| Jump sequencing | Stub | Action exists; journal-driven retry loop not wired |
+| Refuel sequencing | Stub | State reads exist; scoop sequence not wired |
+| Dock sequencing | Stub | Needs UI menu walk plus status waits |
+| Undock sequencing | Stub | Needs UI menu walk plus status waits |
+| Hotkey registration | Parked | `keyboard` lib doesn't work on macOS; likely future direction is a menu-bar app |
+| Legacy autopilot loop migration | Not ported | `dev_autopilot.py` remains the behavior reference; new `edap/` routines are still minimal |
+
+## Unverified on macOS / CrossOver
+
+- **CV templates on Retina + CrossOver.** Templates were authored against 1080p Windows captures. Nothing has run `cv2.matchTemplate` against a live CrossOver window on this machine yet.
+- **Real-time capture loop.** Only ever captured a single frame. Frame rate and capture cost in a continuous loop are unmeasured.
+- **Journal write latency vs poll rate.** We have not measured how quickly Elite (through CrossOver) flushes events to disk relative to a 0.5s poll.
+- **Window focus during autopilot.** `CGEventPost` is global on macOS; behavior across focus loss and multi-monitor setups during a live run is untested.
+
+Full detail: `docs/research/0004-legacy-autopilot-port-status.md`.
+
+## Next Plans
+
+| Plan | File | Depends on | Ready to start |
+| --- | --- | --- | --- |
+| 0002 CV Pipeline Scaffold | `docs/plans/0002-cv-pipeline-scaffold.md` | nothing | yes |
+| 0003 Journal-Driven Routines | `docs/plans/0003-journal-driven-routines.md` | nothing | yes |
+| 0004 Runtime Diagnostics Dashboard | `docs/plans/0004-runtime-diagnostics-dashboard.md` | 0002/0003 helpful first | after |
+
+Plans 0002 and 0003 are independent and can run in parallel.
+
+- First task in 0003: `auto_zero_throttle_on_arrival` — smallest end-to-end exercise of the watcher-to-controls path.
+- First task in 0002: `scratch_cv.py` — answers whether legacy templates match macOS + CrossOver captures before any align work is attempted.
+- Then: use plan 0004 to measure capture-loop performance and journal latency once the first CV probe or first journal routine exists.

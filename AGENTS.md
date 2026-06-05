@@ -13,16 +13,15 @@ Near-term work should optimize for:
 
 ## Current Direction
 
-The immediate product goal is not a full rewrite and not a full-featured autopilot.
+The immediate product goal is not a full rewrite and not a full-featured autopilot. The macOS MVP portability milestone is complete. Current work focuses on the follow-up plans: CV pipeline validation, journal-driven routines, and a diagnostics dashboard.
 
-The macOS diagnostics checkpoint is already proven for the core runtime assumptions:
+See [docs/STATUS.md](docs/STATUS.md) for the current port status, what is stubbed, what is unverified, and which plan to pick up next.
 
-- journal access works
-- bindings parsing works
-- screen capture works
-- synthetic input reaches the CrossOver game window
+`docs/STATUS.md` is the canonical maintained-over-time status document for this repo. It is not meant to be a frozen snapshot.
 
-The current engineering focus is wiring parsed bindings and small runtime actions onto the new platform seams before attempting deeper autopilot behavior.
+- Read `docs/STATUS.md` before starting substantial work.
+- Update `docs/STATUS.md` at the end of any session that changes project understanding, port status, completed work, open gaps, or recommended next steps.
+- Keep it concise and current so the next agent can resume from it directly.
 
 ## Working Rules
 
@@ -56,7 +55,8 @@ When work is delegated to agents:
 
 After an agent finishes:
 
-- capture the result in docs if it changes project understanding, status, or next steps
+- capture the result in `docs/STATUS.md` if it changes project understanding, status, or next steps
+- update any deeper supporting docs only when the change needs more detail than `docs/STATUS.md` should carry
 - integrate and commit the work atomically in logically grouped commits
 - close the completed agent once its work has been captured
 
