@@ -24,8 +24,9 @@ Market commands:
     market unlock          unfreeze panel
 
 Other:
-    q / quit           exit
-    help               show this list
+    commands           list supported commands
+    help [command]     explain a command in plain English
+    q / quit           cancel active work if needed, then exit
 """
 from __future__ import annotations
 
@@ -94,6 +95,121 @@ class _MarketData:
     timestamp: str = ""
     items: list[dict[str, Any]] = field(default_factory=list)
     locked: bool = False
+
+
+@dataclass(frozen=True)
+class _CommandHelp:
+    name: str
+    usage: str
+    summary: str
+    detail: str
+    aliases: tuple[str, ...] = ()
+
+
+class _RoutineCancelled(Exception):
+    """Raised when a control-room routine worker is cancelled."""
+
+
+class _CancellationProxy:
+    def __init__(self, target: Any, check_cancelled: Callable[[], None]) -> None:
+        self._target = target
+        self._check_cancelled = check_cancelled
+
+    def __getattr__(self, name: str) -> Any:
+        attr = getattr(self._target, name)
+        if not callable(attr):
+            return attr
+
+        def wrapped(*args: Any, **kwargs: Any) -> Any:
+            self._check_cancelled()
+            return attr(*args, **kwargs)
+
+        return wrapped
+
+
+_COMMANDS: list[_CommandHelp] = [
+    _CommandHelp(
+        name="dock",
+        usage="dock",
+        summary="Dock at the current station target and auto-refuel after touchdown.",
+        detail="Starts the docking routine. If you're already in normal space it skips the supercruise-exit wait; otherwise it waits for the drop, sends the docking request menu flow, and auto-refuels after docking.",
+    ),
+    _CommandHelp(
+        name="undock",
+        usage="undock",
+        summary="Launch from the current station and wait for the Undocked journal event.",
+        detail="Runs the station launch menu flow, then waits for the journal to confirm that the ship has actually undocked before reporting success.",
+    ),
+    _CommandHelp(
+        name="jump",
+        usage="jump",
+        summary="Trigger the FSD jump sequence and zero throttle on arrival.",
+        detail="Sends the hyperspace control, waits for the jump to start, waits to re-enter supercruise at the destination, then sets speed to zero.",
+    ),
+    _CommandHelp(
+        name="buy",
+        usage="buy <item> [amount|max]",
+        summary="Buy a commodity from the current station market.",
+        detail="Opens the commodities market, finds the named item in the buy list, sets the requested quantity or MAX, confirms the trade, and waits for a MarketBuy journal event.",
+    ),
+    _CommandHelp(
+        name="sell",
+        usage="sell [item] [amount|max]",
+        summary="Sell cargo from the current station market.",
+        detail="With an item name it sells that commodity. With no item it walks your cargo manifest and tries to sell every non-stolen, non-mission cargo item, skipping items the market won't buy.",
+    ),
+    _CommandHelp(
+        name="haul",
+        usage="haul [commodity]",
+        summary="Run the community haul loop, prompting for missing stations and systems.",
+        detail="Starts the sell-undock-travel-buy-undock-travel cycle for one commodity. If you omit values, control room prompts for the missing haul parameters before launching the loop.",
+    ),
+    _CommandHelp(
+        name="dest",
+        usage="dest <system>",
+        summary="Open the galaxy map and plot a route to a named system.",
+        detail="Opens the galaxy map, types the destination into search, plots the route, verifies NavRoute.json, and closes the map again.",
+        aliases=("set_dest",),
+    ),
+    _CommandHelp(
+        name="market",
+        usage="market | market clear | market filter <name> | market lock | market unlock",
+        summary="Control the market panel filter and lock state.",
+        detail="Use 'market filter <name>' to filter visible items, 'market' or 'market clear' to remove the filter, 'market lock' to freeze the panel to the current station, and 'market unlock' to resume live updates.",
+    ),
+    _CommandHelp(
+        name="verbose",
+        usage="verbose [on|off]",
+        summary="Turn verbose keypress logging on or off.",
+        detail="When verbose mode is on, individual key presses from routine dispatch are written into the activity log. When off, only higher-level progress messages are shown.",
+    ),
+    _CommandHelp(
+        name="commands",
+        usage="commands",
+        summary="List every supported control-room command.",
+        detail="Prints the command names and their one-line summaries so you can discover what control room currently supports.",
+    ),
+    _CommandHelp(
+        name="help",
+        usage="help [command]",
+        summary="Show general help or explain one command in plain English.",
+        detail="With no argument it explains how to discover commands. With a command name, it prints that command's usage, aliases, and what it is meant to do in human terms.",
+        aliases=("?",),
+    ),
+    _CommandHelp(
+        name="quit",
+        usage="q | quit | exit",
+        summary="Cancel active work if needed, then shut down control room cleanly.",
+        detail="Starts the control-room shutdown path. If a routine is running, control room cancels it first and exits after the worker unwinds; otherwise it exits immediately.",
+        aliases=("q", "exit"),
+    ),
+]
+
+_COMMAND_INDEX: dict[str, _CommandHelp] = {}
+for _command in _COMMANDS:
+    _COMMAND_INDEX[_command.name] = _command
+    for _alias in _command.aliases:
+        _COMMAND_INDEX[_alias] = _command
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -192,7 +308,10 @@ class ControlRoomApp(App[None]):
         self._history: list[str] = []
         self._history_pos: int = 0  # len(_history) means "not browsing"
         self._history_draft: str = ""  # saved draft while navigating history
-        self._exit_pending: bool = False
+        self._shutdown_requested: bool = False
+        self._shutdown_finalized: bool = False
+        self._watcher_worker: Any | None = None
+        self._routine_worker: Any | None = None
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
@@ -201,7 +320,7 @@ class ControlRoomApp(App[None]):
                 yield Static(id="status")
                 yield RichLog(id="activity", markup=True, highlight=True, wrap=True)
             yield Static(id="market")
-        yield Input(placeholder="dock | undock | buy <item> [N] | sell [item] | haul [commodity] | dest <system> | market filter <name>|lock|unlock | q", id="cmd")
+        yield Input(placeholder="commands | help dock | dock | undock | buy <item> [N] | sell [item] | haul [commodity] | dest <system> | market ... | q", id="cmd")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -214,7 +333,7 @@ class ControlRoomApp(App[None]):
         self._load_market_json()
         self._refresh_status()
         self._refresh_market()
-        self._start_watcher()
+        self._watcher_worker = self._start_watcher()
         self.set_focus(self.query_one("#cmd", Input))
 
     # ── Setup ──────────────────────────────────────────────────────────────────
@@ -474,7 +593,7 @@ class ControlRoomApp(App[None]):
 
     # ── Background status watcher ──────────────────────────────────────────────
 
-    @work(thread=True)
+    @work(thread=True, group="watchers", exclusive=True)
     def _start_watcher(self) -> None:
         worker = get_current_worker()
         watcher = JournalWatcher(self._journal_dir)
@@ -503,22 +622,49 @@ class ControlRoomApp(App[None]):
 
     def _make_progress(self) -> Callable[[str], None]:
         def progress(msg: str) -> None:
+            self._raise_if_worker_cancelled()
             self.call_from_thread(self._log, f"[dim]  {escape(msg)}[/]")
         return progress
 
     def _make_controls(self, progress_fn: Callable[[str], None]) -> ProgressShipControls:
-        return ProgressShipControls(self._controls, progress_fn, verbose=self._verbose_controls)  # type: ignore[arg-type]
+        controls = ProgressShipControls(self._controls, progress_fn, verbose=self._verbose_controls)  # type: ignore[arg-type]
+        return _CancellationProxy(controls, self._raise_if_worker_cancelled)
 
-    @work(thread=True)
+    def _make_watcher(self) -> Any:
+        watcher = JournalWatcher(self._journal_dir)
+        return _CancellationProxy(watcher, self._raise_if_worker_cancelled)
+
+    def _make_sleeper(self) -> Callable[[float], None]:
+        def sleeper(delay_s: float) -> None:
+            deadline = time.monotonic() + max(0.0, delay_s)
+            while True:
+                self._raise_if_worker_cancelled()
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    return
+                time.sleep(min(0.1, remaining))
+        return sleeper
+
+    def _raise_if_worker_cancelled(self) -> None:
+        worker = get_current_worker()
+        if worker.is_cancelled:
+            raise _RoutineCancelled()
+
+    @work(thread=True, group="routines", exclusive=True)
     def _run_in_thread(self, fn: Callable[[], RoutineResult | None]) -> None:
+        worker = get_current_worker()
         try:
             result = fn()
-            if result is not None:
+            if worker.is_cancelled:
+                self.call_from_thread(self._log, "[yellow]Routine cancelled.[/]")
+            elif result is not None:
                 status = result.dispatch.status
                 color = "green" if status == "ok" else "yellow"
                 self.call_from_thread(
                     self._log, f"[{color}]Done: {escape(result.action)} ({escape(status)})[/]"
                 )
+        except _RoutineCancelled:
+            self.call_from_thread(self._log, "[yellow]Routine cancelled.[/]")
         except Exception as exc:
             self.call_from_thread(self._log, f"[red]Routine error: {escape(str(exc))}[/]")
         finally:
@@ -526,6 +672,9 @@ class ControlRoomApp(App[None]):
 
     def _clear_routine(self) -> None:
         self._routine_active = False
+        self._routine_worker = None
+        if self._shutdown_requested:
+            self._finalize_shutdown()
 
     # ── Routine commands ───────────────────────────────────────────────────────
 
@@ -535,18 +684,20 @@ class ControlRoomApp(App[None]):
         skip_scx = self._ship.status == "in_space"
         progress = self._make_progress()
         controls = self._make_controls(progress)
+        sleeper = self._make_sleeper()
         step_delay = self._config.controls.step_delay_seconds
-        watcher = JournalWatcher(self._journal_dir)
+        watcher = self._make_watcher()
 
         self._routine_active = True
         label = "dock (already in space)" if skip_scx else "dock (waiting for supercruise exit)"
         self._log(f"Starting {label}, auto-refuel on...")
-        self._run_in_thread(lambda: dock(
+        self._routine_worker = self._run_in_thread(lambda: dock(
             controls,
             watcher,
             wait_for_supercruise_exit=not skip_scx,
             auto_refuel=True,
             step_delay_s=step_delay,
+            sleeper=sleeper,
             progress_fn=progress,
         ))
 
@@ -555,15 +706,17 @@ class ControlRoomApp(App[None]):
             return
         progress = self._make_progress()
         controls = self._make_controls(progress)
+        sleeper = self._make_sleeper()
         step_delay = self._config.controls.step_delay_seconds
-        watcher = JournalWatcher(self._journal_dir)
+        watcher = self._make_watcher()
 
         self._routine_active = True
         self._log("Starting undock...")
-        self._run_in_thread(lambda: undock(
+        self._routine_worker = self._run_in_thread(lambda: undock(
             controls,
             watcher,
             step_delay_s=step_delay,
+            sleeper=sleeper,
             progress_fn=progress,
         ))
 
@@ -572,11 +725,11 @@ class ControlRoomApp(App[None]):
             return
         progress = self._make_progress()
         controls = self._make_controls(progress)
-        watcher = JournalWatcher(self._journal_dir)
+        watcher = self._make_watcher()
 
         self._routine_active = True
         self._log("Starting jump sequence...")
-        self._run_in_thread(lambda: jump(
+        self._routine_worker = self._run_in_thread(lambda: jump(
             controls,
             watcher,
             progress_fn=progress,
@@ -590,16 +743,18 @@ class ControlRoomApp(App[None]):
             return
         progress = self._make_progress()
         controls = self._make_controls(progress)
+        sleeper = self._make_sleeper()
         step_delay = self._config.controls.step_delay_seconds
         journal_dir = self._journal_dir
 
         self._routine_active = True
         self._log(f"Setting galaxy map destination: [bold]{escape(destination)}[/]...")
-        self._run_in_thread(lambda: set_gal_map_destination(
+        self._routine_worker = self._run_in_thread(lambda: set_gal_map_destination(
             controls,
             destination=destination,
             journal_dir=journal_dir,
             step_delay_s=step_delay,
+            sleeper=sleeper,
             progress_fn=progress,
         ))
 
@@ -618,20 +773,22 @@ class ControlRoomApp(App[None]):
 
         progress = self._make_progress()
         controls = self._make_controls(progress)
+        sleeper = self._make_sleeper()
         step_delay = self._config.controls.step_delay_seconds
         market_path = self._market_path
-        watcher = JournalWatcher(self._journal_dir)
+        watcher = self._make_watcher()
 
         self._routine_active = True
         amt_label = str(amount) + ("t" if isinstance(amount, int) else "")
         self._log(f"Buying {amt_label} [cyan]{escape(target)}[/]...")
-        self._run_in_thread(lambda: market_buy(
+        self._routine_worker = self._run_in_thread(lambda: market_buy(
             controls,
             watcher,
             market_path=market_path,
             target=target,
             amount=amount,
             step_delay_s=step_delay,
+            sleeper=sleeper,
             progress_fn=progress,
         ))
 
@@ -652,19 +809,21 @@ class ControlRoomApp(App[None]):
     def _sell_item(self, target: str, amount: int | str) -> None:
         progress = self._make_progress()
         controls = self._make_controls(progress)
+        sleeper = self._make_sleeper()
         step_delay = self._config.controls.step_delay_seconds
         market_path = self._market_path
-        watcher = JournalWatcher(self._journal_dir)
+        watcher = self._make_watcher()
 
         self._routine_active = True
         amt_label = str(amount) + ("t" if isinstance(amount, int) else "")
         self._log(f"Selling {amt_label} [cyan]{escape(target)}[/]...")
-        self._run_in_thread(lambda: market_sell(
+        self._routine_worker = self._run_in_thread(lambda: market_sell(
             controls, watcher,
             market_path=market_path,
             target=target,
             amount=amount,
             step_delay_s=step_delay,
+            sleeper=sleeper,
             progress_fn=progress,
         ))
 
@@ -682,9 +841,10 @@ class ControlRoomApp(App[None]):
 
         progress = self._make_progress()
         controls = self._make_controls(progress)
+        sleeper = self._make_sleeper()
         step_delay = self._config.controls.step_delay_seconds
         market_path = self._market_path
-        watcher = JournalWatcher(self._journal_dir)
+        watcher = self._make_watcher()
 
         names = ", ".join(item.get("Name_Localised") or item.get("Name", "?") for item in inventory)
         self._log(f"Selling all cargo: [cyan]{escape(names)}[/]")
@@ -692,6 +852,7 @@ class ControlRoomApp(App[None]):
 
         def run_all() -> None:
             for item in inventory:
+                self._raise_if_worker_cancelled()
                 name = item.get("Name_Localised") or item.get("Name", "?")
                 self.call_from_thread(self._log, f"  → [cyan]{escape(name)}[/] (MAX)...")
                 try:
@@ -701,6 +862,7 @@ class ControlRoomApp(App[None]):
                         target=name,
                         amount="MAX",
                         step_delay_s=step_delay,
+                        sleeper=sleeper,
                         progress_fn=progress,
                     )
                     status = result.dispatch.status
@@ -712,7 +874,7 @@ class ControlRoomApp(App[None]):
                     )
             self.call_from_thread(self._log, "[green]Sell-all complete[/]")
 
-        self._run_in_thread(run_all)
+        self._routine_worker = self._run_in_thread(run_all)
 
     def _cmd_haul(self, rest: str) -> None:
         if not self._check_routine_ready():
@@ -731,7 +893,7 @@ class ControlRoomApp(App[None]):
             self.query_one("#cmd", Input).placeholder = "buy station (Enter to skip)..."
 
     def _handle_haul_prompt(self, value: str) -> None:
-        _DEFAULT_PLACEHOLDER = "dock | undock | buy <item> [N] | sell [item] | haul [commodity] | dest <system> | market filter <name>|lock|unlock | q"
+        _DEFAULT_PLACEHOLDER = "commands | help dock | dock | undock | buy <item> [N] | sell [item] | haul [commodity] | dest <system> | market ... | q"
         if self._haul_prompt_step == "commodity":
             if not value.strip():
                 self._log("[red]Commodity is required — enter a commodity name.[/]")
@@ -808,9 +970,10 @@ class ControlRoomApp(App[None]):
 
         progress = self._make_progress()
         controls = self._make_controls(progress)
+        sleeper = self._make_sleeper()
         step_delay = self._config.controls.step_delay_seconds
         journal_dir = self._journal_dir
-        watcher = JournalWatcher(journal_dir)
+        watcher = self._make_watcher()
 
         label_parts = [f"[cyan]{escape(commodity)}[/]"]
         if buy_station:
@@ -824,7 +987,7 @@ class ControlRoomApp(App[None]):
         self._log(f"Starting haul loop: {', '.join(label_parts)} (infinite)...")
         self._routine_active = True
 
-        self._run_in_thread(lambda: haul_loop(
+        self._routine_worker = self._run_in_thread(lambda: haul_loop(
             controls,
             watcher,
             journal_dir=journal_dir,
@@ -834,21 +997,36 @@ class ControlRoomApp(App[None]):
             sell_system=sell_system,
             buy_system=buy_system,
             step_delay_s=step_delay,
+            sleeper=sleeper,
             progress_fn=progress,
         ))
 
     # ── Quit ───────────────────────────────────────────────────────────────────
 
     def action_request_quit(self) -> None:
-        if self._exit_pending:
-            self.exit()
-        else:
-            self._exit_pending = True
-            self._log("[yellow]Press Ctrl-C or Ctrl-D again to exit.[/]")
-            self.set_timer(5, self._clear_exit_pending)
+        if self._routine_active and self._routine_worker is not None:
+            self._cancel_active_routine("Ctrl-C / Ctrl-D")
+            return
+        self._request_shutdown("Ctrl-C / Ctrl-D")
 
-    def _clear_exit_pending(self) -> None:
-        self._exit_pending = False
+    def _cancel_active_routine(self, source: str) -> None:
+        self._log(f"[yellow]{escape(source)} received — cancelling active routine.[/]")
+        self._routine_worker.cancel()
+
+    def _request_shutdown(self, source: str) -> None:
+        if self._shutdown_requested:
+            return
+        self._shutdown_requested = True
+        self._log(f"[yellow]{escape(source)} received — exiting control room.[/]")
+        self._finalize_shutdown()
+
+    def _finalize_shutdown(self) -> None:
+        if self._shutdown_finalized:
+            return
+        self._shutdown_finalized = True
+        self.workers.cancel_group(self, "watchers")
+        self.workers.cancel_group(self, "routines")
+        self.exit()
 
     # ── Command input ──────────────────────────────────────────────────────────
 
@@ -901,9 +1079,12 @@ class ControlRoomApp(App[None]):
         self._history_pos = len(self._history)
         self._history_draft = ""
 
+        self._dispatch_command(raw)
+
+    def _dispatch_command(self, raw: str) -> None:
         cmd = raw.lower()
         if cmd in {"q", "quit", "exit"}:
-            self.exit()
+            self._request_shutdown("quit command")
             return
 
         parts = cmd.split(None, 1)
@@ -933,13 +1114,36 @@ class ControlRoomApp(App[None]):
             self._cmd_market(raw_rest)
         elif verb == "verbose":
             self._cmd_verbose(rest)
+        elif verb == "commands":
+            self._cmd_commands()
         elif verb in {"help", "?"}:
-            self._log(
-                "[dim]Routines: dock | undock | jump | buy <item> [N] | sell [item] [N] | haul [commodity] | dest <system>  "
-                "—  Market: market filter <name> | market [clear] | market lock | market unlock  —  verbose [on|off]  —  q to quit[/]"
-            )
+            self._cmd_help(raw_rest)
         else:
             self._log(f"[dim]Unknown command: {escape(raw)}[/]")
+
+    def _cmd_commands(self) -> None:
+        self._log("[dim]Supported commands:[/]")
+        for command in _COMMANDS:
+            aliases = f" [dim](aliases: {', '.join(command.aliases)})[/]" if command.aliases else ""
+            self._log(f"[bold]{escape(command.usage)}[/] — {escape(command.summary)}{aliases}")
+
+    def _cmd_help(self, rest: str) -> None:
+        topic = rest.strip().lower()
+        if not topic:
+            self._log("[dim]Use [bold]commands[/] to list everything, or [bold]help <command>[/] for one command in plain English.[/]")
+            return
+
+        command = _COMMAND_INDEX.get(topic)
+        if command is None:
+            self._log(f"[red]Unknown help topic: {escape(rest)}[/]")
+            return
+
+        aliases = f"  Aliases: {', '.join(command.aliases)}" if command.aliases else ""
+        self._log(
+            f"[bold]{escape(command.name)}[/] — {escape(command.usage)}"
+            f"{f'[dim]{escape(aliases)}[/]' if aliases else ''}"
+        )
+        self._log(escape(command.detail))
 
     def _cmd_verbose(self, rest: str) -> None:
         if rest in {"on", "1", "true"}:

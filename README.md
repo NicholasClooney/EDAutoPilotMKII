@@ -208,6 +208,8 @@ uv run python3 control_room.py --config config.toml --market aluminium
 
 Only one routine can run at a time. A second command while a routine is active is rejected. Routine progress lines (waiting-for-event, key presses, pauses) appear in the activity log in dim text.
 
+If you press `Ctrl-C` or `Ctrl-D` while a routine is active, control room now cancels the active routine worker and stays open. The same keys exit control room only when it is idle.
+
 **Market commands**
 
 | Command | What it does |
@@ -221,8 +223,9 @@ Only one routine can run at a time. A second command while a routine is active i
 
 | Command | What it does |
 |---|---|
-| `help` | Print command summary to the activity log. |
-| `q` / `quit` | Exit. |
+| `commands` | Print the full supported command list to the activity log. |
+| `help [command]` | Explain one command in plain English, including what it tries to do. |
+| `q` / `quit` / `exit` | Cancel active work if needed, then exit control room cleanly. |
 
 Cargo state comes from `Cargo` journal events (written by the game on load and after each trade). If the game hasn't written a `Cargo` event since startup, `sell` (no args) will report an empty manifest; use `sell <item>` with an explicit commodity name as the fallback.
 
