@@ -175,8 +175,8 @@ def main() -> int:
     parser.add_argument(
         "--dock-timeout-seconds",
         type=float,
-        default=120.0,
-        help="Maximum time to wait for a Docked event for station routines",
+        default=None,
+        help="Maximum time to wait for a Docked event (defaults: dock=120, haul_loop=config/600)",
     )
     parser.add_argument(
         "--request-timeout-seconds",
@@ -340,7 +340,7 @@ def main() -> int:
     if step_delay_seconds < 0:
         sys.stderr.write("Invalid routine request: --step-delay-seconds must be non-negative\n")
         return 2
-    if args.dock_timeout_seconds < 0:
+    if args.dock_timeout_seconds is not None and args.dock_timeout_seconds < 0:
         sys.stderr.write("Invalid routine request: --dock-timeout-seconds must be non-negative\n")
         return 2
     if args.request_timeout_seconds < 0:
@@ -430,6 +430,15 @@ def main() -> int:
         routine_actions = ["GalaxyMapOpen", "UI_Up", "UI_Select", "UI_Right", "CamZoomIn"]
 
     runtime = build_runtime_context(loaded.config, actions=routine_actions)
+    dock_timeout_seconds = (
+        args.dock_timeout_seconds
+        if args.dock_timeout_seconds is not None
+        else (
+            loaded.config.controls.haul_dock_timeout_seconds
+            if args.routine == ROUTINE_HAUL_LOOP
+            else 120.0
+        )
+    )
     journal_dir = runtime.journal.effective_path
     journal_source = runtime.journal.cli_source_status()
     routine_needs_journal = args.routine in {
@@ -584,7 +593,7 @@ def main() -> int:
                 auto_refuel=args.auto_refuel,
                 max_retries=args.max_retries,
                 request_timeout_s=args.request_timeout_seconds,
-                dock_timeout_s=args.dock_timeout_seconds,
+                dock_timeout_s=dock_timeout_seconds,
                 settle_s=args.settle_seconds,
                 step_delay_s=step_delay_seconds,
                 boost_settle_s=args.boost_settle_seconds,
@@ -596,7 +605,7 @@ def main() -> int:
             result = station_refuel_menu(
                 logging_controls,
                 watcher,
-                dock_timeout_s=args.dock_timeout_seconds,
+                dock_timeout_s=dock_timeout_seconds,
                 settle_s=args.settle_seconds,
                 sleeper=logging_sleeper,
                 progress_fn=_progress,
@@ -649,7 +658,7 @@ def main() -> int:
                 iterations=args.iterations,
                 step_delay_s=step_delay_seconds,
                 max_hold_s=args.max_hold_seconds,
-                dock_timeout_s=args.dock_timeout_seconds,
+                dock_timeout_s=dock_timeout_seconds,
                 request_timeout_s=args.request_timeout_seconds,
                 undock_timeout_s=args.undock_timeout_seconds,
                 trade_timeout_s=args.trade_timeout_seconds,
@@ -709,7 +718,7 @@ def main() -> int:
             "hold_s": args.hold_seconds,
             "poll_interval_s": args.poll_interval_seconds,
             "settle_s": args.settle_seconds,
-            "dock_timeout_s": args.dock_timeout_seconds,
+            "dock_timeout_s": dock_timeout_seconds,
             "request_timeout_s": args.request_timeout_seconds,
             "skip_supercruise_exit": args.skip_supercruise_exit,
             "auto_refuel": args.auto_refuel,

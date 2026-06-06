@@ -15,6 +15,8 @@ continuous_action_hold_seconds = 0.2
 step_delay_seconds = 0.3
 # Shared settle delay for galaxy-map result loading and route plotting.
 galaxy_map_settle_seconds = 2.0
+# Default docking timeout for haul-loop station arrivals.
+haul_dock_timeout_seconds = 600.0
 
 [screen]
 resolution_width = 1920

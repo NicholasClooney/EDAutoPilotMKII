@@ -43,7 +43,7 @@ def haul_loop(
     iterations: int = 0,
     step_delay_s: float = 1.0,
     max_hold_s: float = 10.0,
-    dock_timeout_s: float = 120.0,
+    dock_timeout_s: float = 600.0,
     request_timeout_s: float = 20.0,
     undock_timeout_s: float = 30.0,
     trade_timeout_s: float = 30.0,

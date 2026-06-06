@@ -44,7 +44,7 @@ from rich.text import Text
 from textual import work
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical
-from textual.widgets import Footer, Header, Input, RichLog, Static
+from textual.widgets import Footer, Header, Input, Static, TextArea
 from textual.worker import get_current_worker
 
 from edap.config import AppConfig
@@ -69,6 +69,7 @@ _ALL_ROUTINE_ACTIONS = [
 ]
 
 _DEFAULT_COMMAND_PLACEHOLDER = "commands | help dock | dock | undock | buy <item> [N] | sell [item] | haul [commodity] | dest <system> | market ... | q"
+_MAX_ACTIVITY_LINES = 2000
 
 
 # ── State ──────────────────────────────────────────────────────────────────────
@@ -164,7 +165,7 @@ _COMMANDS: list[_CommandHelp] = [
         name="haul",
         usage="haul [commodity]",
         summary="Run the community haul loop, prompting for missing stations and systems.",
-        detail="Starts the sell-undock-travel-buy-undock-travel cycle for one commodity. Control room prompts for the missing haul parameters before launching the loop, including the galaxy-map settle delay used by route plotting.",
+        detail="Starts the sell-undock-travel-buy-undock-travel cycle for one commodity. Control room prompts for the missing haul parameters before launching the loop, including the galaxy-map settle delay used by route plotting and the docking timeout for station arrival.",
     ),
     _CommandHelp(
         name="dest",
@@ -260,6 +261,13 @@ def _parse_amount(s: str) -> int | str | None:
         return None
 
 
+def _plain_text(message: str) -> str:
+    try:
+        return Text.from_markup(message).plain
+    except Exception:
+        return message
+
+
 # ── App ────────────────────────────────────────────────────────────────────────
 
 
@@ -272,7 +280,7 @@ class ControlRoomApp(App[None]):
     CSS = """
     Screen  { layout: vertical; }
     #main   { height: 1fr; }
-    #left   { width: 45%; }
+    #left   { width: 58%; }
     #status {
         height: auto;
         max-height: 14;
@@ -285,7 +293,7 @@ class ControlRoomApp(App[None]):
         padding: 0 1;
     }
     #market {
-        width: 1fr;
+        width: 42%;
         border: solid $primary;
         padding: 0 1;
     }
@@ -305,8 +313,9 @@ class ControlRoomApp(App[None]):
         self._controls: ShipControls | None = None
         self._routine_active = False
         self._verbose_controls: bool = False
+        self._activity_lines: list[str] = []
         self._haul_params: dict[str, str] = {}
-        self._haul_prompt_step: str = ""  # "commodity" | "buy_station" | "sell_station" | "sell_system" | "buy_system" | "galaxy_map_settle"
+        self._haul_prompt_step: str = ""  # "commodity" | "buy_station" | "sell_station" | "sell_system" | "buy_system" | "galaxy_map_settle" | "dock_timeout"
         self._dest_prompt_destination: str = ""
         self._history: list[str] = []
         self._history_pos: int = 0  # len(_history) means "not browsing"
@@ -321,7 +330,14 @@ class ControlRoomApp(App[None]):
         with Horizontal(id="main"):
             with Vertical(id="left"):
                 yield Static(id="status")
-                yield RichLog(id="activity", markup=True, highlight=True, wrap=True)
+                yield TextArea(
+                    "",
+                    id="activity",
+                    read_only=True,
+                    soft_wrap=True,
+                    show_line_numbers=False,
+                    show_cursor=False,
+                )
             yield Static(id="market")
         yield Input(placeholder=_DEFAULT_COMMAND_PLACEHOLDER, id="cmd")
         yield Footer()
@@ -329,7 +345,7 @@ class ControlRoomApp(App[None]):
     def on_mount(self) -> None:
         self.title = "ED Control Room"
         self.query_one("#status", Static).border_title = "SHIP STATUS"
-        self.query_one("#activity", RichLog).border_title = "ACTIVITY"
+        self.query_one("#activity", TextArea).border_title = "ACTIVITY"
         self.query_one("#market", Static).border_title = "MARKET"
         self._build_controls()
         self._bootstrap_ship_state()
@@ -456,9 +472,13 @@ class ControlRoomApp(App[None]):
         widget.update(Text.from_markup("\n".join(sections)))
 
     def _log(self, msg: str) -> None:
-        self.query_one("#activity", RichLog).write(
-            f"[dim]{_hhmmss()}[/]  {msg}"
-        )
+        line = f"{_hhmmss()}  {_plain_text(msg)}"
+        self._activity_lines.append(line)
+        if len(self._activity_lines) > _MAX_ACTIVITY_LINES:
+            self._activity_lines = self._activity_lines[-_MAX_ACTIVITY_LINES:]
+        activity = self.query_one("#activity", TextArea)
+        activity.load_text("\n".join(self._activity_lines))
+        activity.scroll_end(animate=False)
 
     # ── Market JSON ────────────────────────────────────────────────────────────
 
@@ -906,6 +926,7 @@ class ControlRoomApp(App[None]):
             "sell_system": "",
             "buy_system": "",
             "galaxy_map_settle": "",
+            "dock_timeout": "",
         }
         if not commodity:
             self._haul_prompt_step = "commodity"
@@ -982,6 +1003,25 @@ class ControlRoomApp(App[None]):
                 return
             self._haul_params["galaxy_map_settle"] = str(parsed)
             self._log(f"  Galaxy-map settle: [cyan]{parsed:.1f}s[/]")
+            default_timeout = self._config.controls.haul_dock_timeout_seconds
+            self._haul_prompt_step = "dock_timeout"
+            self._log(
+                f"[dim]Haul docking timeout seconds? "
+                f"(Enter = {default_timeout:.1f})[/]"
+            )
+            self.query_one("#cmd", Input).placeholder = (
+                f"haul docking timeout seconds (Enter = {default_timeout:.1f})..."
+            )
+        elif self._haul_prompt_step == "dock_timeout":
+            parsed = self._parse_optional_nonnegative_float(
+                value,
+                default=self._config.controls.haul_dock_timeout_seconds,
+                label="Haul docking timeout seconds",
+            )
+            if parsed is None:
+                return
+            self._haul_params["dock_timeout"] = str(parsed)
+            self._log(f"  Haul docking timeout: [cyan]{parsed:.1f}s[/]")
             self._haul_prompt_step = ""
             self.query_one("#cmd", Input).placeholder = _DEFAULT_COMMAND_PLACEHOLDER
             self._dispatch_haul_loop()
@@ -993,6 +1033,7 @@ class ControlRoomApp(App[None]):
         sell_system = self._haul_params.get("sell_system", "")
         buy_system = self._haul_params.get("buy_system", "")
         galaxy_map_settle_raw = self._haul_params.get("galaxy_map_settle", "")
+        dock_timeout_raw = self._haul_params.get("dock_timeout", "")
 
         if self._ship.status != "in_station":
             self._log("[red]Haul loop requires you to be docked at the sell station before starting.[/]")
@@ -1022,6 +1063,11 @@ class ControlRoomApp(App[None]):
             if galaxy_map_settle_raw
             else self._config.controls.galaxy_map_settle_seconds
         )
+        dock_timeout = (
+            float(dock_timeout_raw)
+            if dock_timeout_raw
+            else self._config.controls.haul_dock_timeout_seconds
+        )
         journal_dir = self._journal_dir
         watcher = self._make_watcher()
 
@@ -1035,6 +1081,7 @@ class ControlRoomApp(App[None]):
         if sell_system:
             label_parts.append(f"sell sys: [cyan]{escape(sell_system)}[/]")
         label_parts.append(f"map settle: [cyan]{galaxy_map_settle:.1f}s[/]")
+        label_parts.append(f"dock timeout: [cyan]{dock_timeout:.1f}s[/]")
         self._log(f"Starting haul loop: {', '.join(label_parts)} (infinite)...")
         self._routine_active = True
 
@@ -1048,6 +1095,7 @@ class ControlRoomApp(App[None]):
             sell_system=sell_system,
             buy_system=buy_system,
             step_delay_s=step_delay,
+            dock_timeout_s=dock_timeout,
             galaxy_map_settle_s=galaxy_map_settle,
             sleeper=sleeper,
             progress_fn=progress,
