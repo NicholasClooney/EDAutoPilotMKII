@@ -2,7 +2,7 @@
 
 _This is the maintained status document for the repo. Update it at the end of each session when project understanding, port status, or next steps change. Keep it current over time rather than treating it as a frozen checkpoint._
 
-Last updated: 2026-06-06 (session 19)
+Last updated: 2026-06-06 (session 20)
 
 ## Where We Are
 
@@ -71,7 +71,7 @@ The important caveat is that the real autopilot loop is still largely unported. 
 
 ## Unverified on macOS / CrossOver
 
-- **CV templates on Retina + CrossOver.** All three templates re-baked and passing against live CrossOver captures: compass (re-baked from equalized region), navpoint (was already passing), destination (re-baked from orange-filtered center region; `_filter_orange2` range loosened from `[15,220,220]–[30,255,255]` to `[10,100,80]–[30,255,255]` to match CrossOver rendering). `scratch_rebake.py` added as a helper for future re-bakes. Scores observed: compass ~0.6+, navpoint ~0.86, destination passing when target reticle is centered on screen.
+- **CV templates on Retina + CrossOver.** All three templates re-baked and passing against live CrossOver captures: compass (re-baked from equalized region), navpoint (was already passing), destination (re-baked from orange-filtered center region; `_filter_orange2` range loosened from `[15,220,220]–[30,255,255]` to `[10,100,80]–[30,255,255]` to match CrossOver rendering). `scratch_rebake.py` added as a helper for future re-bakes. Scores observed: compass ~0.6+, navpoint ~0.86, destination passing when target reticle is centered on screen. The original pre-rebake compass/destination templates are now kept as `templates/*.og.png`, and the live approach frame used for repeatable checks is stored at `testdata/sc_approach_disengage.png`.
 - **Real-time capture loop.** Only ever captured a single frame. Frame rate and capture cost in a continuous loop are unmeasured.
 - **Journal write latency vs poll rate.** We have not measured how quickly Elite (through CrossOver) flushes events to disk relative to a 0.5s poll.
 - **Window focus during autopilot.** `CGEventPost` is global on macOS; behavior across focus loss and multi-monitor setups during a live run is untested.

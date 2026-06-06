@@ -1,4 +1,5 @@
 venv
+.DS_Store
 .ipynb_checkpoints
 __pycache__
 *.spec
