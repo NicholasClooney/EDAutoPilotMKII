@@ -424,7 +424,10 @@ def main() -> int:
             "CycleNextPanel", "CyclePreviousPanel", "HeadLookReset",
         ]
     elif args.routine == ROUTINE_SET_GAL_MAP_DESTINATION:
-        routine_actions = ["GalaxyMapOpen", "UI_Up", "UI_Select", "UI_Right"]
+        # Keep this list in sync with edap/routines/galaxy_map.py.
+        # The routine uses a direct held Enter for search commit plus these
+        # binding-driven actions, including CamZoomIn for the Odyssey plot flow.
+        routine_actions = ["GalaxyMapOpen", "UI_Up", "UI_Select", "UI_Right", "CamZoomIn"]
 
     runtime = build_runtime_context(loaded.config, actions=routine_actions)
     journal_dir = runtime.journal.effective_path
@@ -550,7 +553,8 @@ def main() -> int:
             _progress(f"  {_describe_binding(runtime.binding_lookup, action)}")
     elif args.routine == ROUTINE_SET_GAL_MAP_DESTINATION:
         _progress(f"Destination: {args.destination!r}")
-        for action in ["GalaxyMapOpen", "UI_Up", "UI_Select", "UI_Right"]:
+        # Keep this binding summary aligned with the routine_actions list above.
+        for action in ["GalaxyMapOpen", "UI_Up", "UI_Select", "UI_Right", "CamZoomIn"]:
             _progress(f"  {_describe_binding(runtime.binding_lookup, action)}")
 
     try:
