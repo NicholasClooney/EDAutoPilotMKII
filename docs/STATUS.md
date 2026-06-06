@@ -59,6 +59,8 @@ The important caveat is that the real autopilot loop is still largely unported. 
 | Station / docked state detection | Partial | `edap/state.py` derives coarse statuses like `in_station`, `starting_docking`, and `in_docking`, but there is no dedicated docked/station snapshot model yet |
 | Hotkey registration | Parked | `keyboard` lib doesn't work on macOS; likely future direction is a menu-bar app |
 | Legacy autopilot loop migration | Not ported | `dev_autopilot.py` remains the behavior reference; new `edap/` routines are still minimal |
+| Market data reading | Done | `scratch_market.py` — reads `Market.json` from journal dir, displays commodity table with buy/sell/stock/demand; run while market screen is open in-game |
+| Market buy/sell routine | Not started | Designed in `docs/plans/0005-market-trading-routine.md`; gated on 3 open questions (list order vs Market.json order, qty input method, UI path to commodities) |
 
 ## Unverified on macOS / CrossOver
 
@@ -76,6 +78,7 @@ Full detail: `docs/research/0004-legacy-autopilot-port-status.md`.
 | 0002 CV Pipeline Scaffold | `docs/plans/0002-cv-pipeline-scaffold.md` | nothing | yes |
 | 0003 Journal-Driven Routines | `docs/plans/0003-journal-driven-routines.md` | nothing | yes |
 | 0004 Runtime Diagnostics Dashboard | `docs/plans/0004-runtime-diagnostics-dashboard.md` | 0002/0003 helpful first | after |
+| 0005 Market Trading Routine | `docs/plans/0005-market-trading-routine.md` | 0003 (JournalWatcher) | gated on 3 open questions |
 
 Plans 0002 and 0003 are independent and can run in parallel.
 
@@ -84,7 +87,7 @@ Plans 0002 and 0003 are independent and can run in parallel.
 These are not scheduled yet but worth capturing for planning.
 
 - **Galaxy map input.** Drive the in-game galaxy map to type a destination system name procedurally, replacing manual system selection. Would unlock fully automated route setting.
-- **Market trading.** Read commodity data from journal/market logs, then drive buy/sell menus via procedural input sequences to automate trade runs.
+- **Market trading.** Journal events alone do not contain commodity listings. Elite Dangerous writes a `Market.json` file to the journal directory whenever the player opens the commodities market screen in-game. It contains the full listing per station: commodity name, buy/sell price, stock units, stock bracket (0-3), demand, and category. `MarketBuy`/`MarketSell` events are written to the journal on completed trades. The market tracker should watch for `Docked` events (station identity) and read `Market.json` (written when market screen opens) to snapshot each station's inventory. From there, UI automation can drive buy/sell sequences using Market.json item order + count-based navigation, since there is no CV yet to read the screen.
 - **Human-like input variation.** Add randomized dwell and inter-key delay variation to all synthetic input so sequences look less robotic. For menu-heavy flows (market buy/sell), include occasional overshoot-and-correct behavior (navigate past item, back up) to mimic human selection patterns.
 - **Monitoring and command center CLI.** A multi-panel terminal UI, likely built on `rich` or `textual`, with:
   - Ship and commander status panel: current system, station, credits, cargo fill, fuel level.
