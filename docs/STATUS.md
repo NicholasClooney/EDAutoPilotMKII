@@ -2,7 +2,7 @@
 
 _This is the maintained status document for the repo. Update it at the end of each session when project understanding, port status, or next steps change. Keep it current over time rather than treating it as a frozen checkpoint._
 
-Last updated: 2026-06-06 (session 4)
+Last updated: 2026-06-06 (session 5)
 
 ## Where We Are
 
@@ -61,6 +61,7 @@ The important caveat is that the real autopilot loop is still largely unported. 
 | Legacy autopilot loop migration | Not ported | `dev_autopilot.py` remains the behavior reference; new `edap/` routines are still minimal |
 | Market data reading | Done | `scratch_market.py` — reads `Market.json` from journal dir, mirrors in-game layout (alphabetical categories, alphabetical items within each); `--raw` flat table with sort options |
 | Market buy/sell routine | Done (not live-validated) | `edap/routines.py` — `market_buy` / `market_sell` wired to `run_routine.py`; sell list filtered by `DemandBracket > 0` (matches game); sell skips quantity input (game pre-fills full cargo); `UI_Back x2` after trade to return to station menu; station guard with `--skip-station-check` bypass; `--target` / `--amount` / `--step-delay-seconds` flags |
+| Control room TUI | Done (not live-validated) | `control_room.py` — Textual TUI with ship status, activity log, and market panels; dispatches `dock`/`undock`/`jump`/`buy`/`sell` routines from the input bar; `sell` with no args iterates full cargo manifest |
 
 ## Unverified on macOS / CrossOver
 
@@ -90,11 +91,7 @@ These are not scheduled yet but worth capturing for planning.
 - **Market trading.** Journal events alone do not contain commodity listings. Elite Dangerous writes a `Market.json` file to the journal directory whenever the player opens the commodities market screen in-game. It contains the full listing per station: commodity name, buy/sell price, stock units, stock bracket (0-3), demand, and category. `MarketBuy`/`MarketSell` events are written to the journal on completed trades. The market tracker should watch for `Docked` events (station identity) and read `Market.json` (written when market screen opens) to snapshot each station's inventory. From there, UI automation can drive buy/sell sequences using Market.json item order + count-based navigation, since there is no CV yet to read the screen.
 - **SC Assist speed management and disengage.** The 7-second rule is the core supercruise disengage mechanic: throttle back when ETA hits ~7s or you overshoot the target. Primary signal is OCR of the ETA countdown next to the destination reticle (small dynamic number, needs pytesseract on an orange-filtered crop). The "TO DISENGAGE" popup is a useful secondary/fallback trigger — it confirms the safe window is open and should still be detected even if ETA OCR misses. Broader throttle strategy: boost out of the departure star's gravity well early, then coast and bleed speed well before the target; how much depends on the remaining distance. Gravity wells from large bodies mid-route can pull the ship off line and slow it — this is pure in-engine physics with no journal signal, so it can only be detected by watching the alignment drift or ETA stalling.
 - **Human-like input variation.** Add randomized dwell and inter-key delay variation to all synthetic input so sequences look less robotic. For menu-heavy flows (market buy/sell), include occasional overshoot-and-correct behavior (navigate past item, back up) to mimic human selection patterns.
-- **Monitoring and command center CLI.** A multi-panel terminal UI, likely built on `rich` or `textual`, with:
-  - Ship and commander status panel: current system, station, credits, cargo fill, fuel level.
-  - Concise activity log panel: timestamped one-liners (docked at X, refueled, bought N units of Y, jumped to Z).
-  - Market tracker panel: persists commodity data scraped from journal/market events across every station visited this session. Tracks supply volume and price for target items per station so you can compare at a glance. A CLI command (e.g. `go <station>`) triggers the galaxy map routine to route to a better-stocked station.
-  - Command input: type commands while the autopilot runs without interrupting the display.
+- **Monitoring and command center CLI.** Implemented in `control_room.py` (Textual TUI, `textual>=0.60` added to `pyproject.toml`). Three panels: SHIP STATUS (commander, system, station, flight status, fuel bar, credits, cargo fill, FSD target — bootstrapped from journal on startup, updated live), ACTIVITY (timestamped one-liners for jumps, docks, trades, missions, refuels — historical events suppressed), MARKET (current station from `Market.json`, auto-reloads on mtime change). Routine dispatch from the input bar: `dock` (always auto-refuels; auto-detects whether supercruise exit has already happened), `undock`, `jump`, `buy <item> [N]`, `sell` (iterates full cargo manifest and sells each non-stolen non-mission item), `sell <item> [N]`. Market commands: `market [filter|lock|unlock]`. Not yet live-validated. Remaining gap: no `go <station>` galaxy map command (depends on galaxy map input idea).
 
 - Next task in 0003: `undock` is live-validated. `refuel` is the only remaining routine; it remains intentionally deferred.
 - `refuel` is intentionally deferred for now.

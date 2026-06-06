@@ -180,6 +180,52 @@ uv run python3 scratch_rebake.py destination --delay 3 --open
 uv run python3 scratch_rebake.py destination --raw /tmp/cv-raw.png --open
 ```
 
+### `control_room.py`
+
+Live three-panel TUI for monitoring ship state and dispatching routines while the game is running. Built on [Textual](https://textual.textualize.io/).
+
+```sh
+uv run python3 control_room.py --config config.toml
+uv run python3 control_room.py --config config.toml --market aluminium
+```
+
+**Layout**
+
+- **SHIP STATUS** (top-left) — commander, system, station, flight status, fuel bar, credits, cargo fill, FSD target. Bootstrapped from the existing journal on startup, then updated live from new events.
+- **ACTIVITY** (bottom-left) — timestamped one-liners for recent events: jumps, docks, undocks, trades, refuels, mission rewards. Historical events on startup are suppressed; only events from the last ~2 minutes are shown.
+- **MARKET** (right) — commodity table loaded from `Market.json`. Reloads automatically when the file changes on disk (i.e. when you open the market screen in-game). Shows BUY and SELL sections filtered by the active filter term.
+
+**Routine commands** (type in the input bar at the bottom)
+
+| Command | What it does |
+|---|---|
+| `dock` | Dock routine + auto-refuel. If the ship is already in normal space, skips waiting for supercruise exit; otherwise waits for it first. |
+| `undock` | Launch from station. |
+| `jump` | FSD jump sequence. |
+| `buy <item> [N\|max]` | Buy N units of a commodity (default MAX). |
+| `sell` | Sell all non-stolen, non-mission cargo. Iterates the cargo manifest and calls `market_sell` on each commodity; skips items the market doesn't buy rather than aborting. |
+| `sell <item> [N\|max]` | Sell a specific commodity. |
+
+Only one routine can run at a time. A second command while a routine is active is rejected. Routine progress lines (waiting-for-event, key presses, pauses) appear in the activity log in dim text.
+
+**Market commands**
+
+| Command | What it does |
+|---|---|
+| `market <term>` | Filter market panel to items matching the term in name or category. |
+| `market lock` | Freeze the market panel to the current station — docking elsewhere won't update it. |
+| `market unlock` | Release the lock. |
+| `market` | Clear the filter. |
+
+**Other**
+
+| Command | What it does |
+|---|---|
+| `help` | Print command summary to the activity log. |
+| `q` / `quit` | Exit. |
+
+Cargo state comes from `Cargo` journal events (written by the game on load and after each trade). If the game hasn't written a `Cargo` event since startup, `sell` (no args) will report an empty manifest; use `sell <item>` with an explicit commodity name as the fallback.
+
 ### `scratch_market.py`
 
 Reads `Market.json` from the journal directory and prints a formatted commodity listing matching the in-game market layout.
