@@ -282,10 +282,10 @@ def main() -> int:
         help="Seconds to wait after plotting before verifying NavRoute (default 2)",
     )
     parser.add_argument(
-        "--max-results",
-        type=int,
-        default=5,
-        help="Maximum number of search results to try before giving up (default 5)",
+        "--select-hold-seconds",
+        type=float,
+        default=5.0,
+        help="Seconds to hold UI_Select when plotting the route (default 5)",
     )
     parser.add_argument(
         "--log-events",
@@ -393,9 +393,6 @@ def main() -> int:
         if not args.destination:
             sys.stderr.write("--destination is required for set_gal_map_destination\n")
             return 2
-        if args.max_results < 1:
-            sys.stderr.write("--max-results must be at least 1\n")
-            return 2
 
     routine_actions = ["SetSpeedZero"]
     if args.routine == ROUTINE_JUMP:
@@ -427,7 +424,7 @@ def main() -> int:
             "CycleNextPanel", "CyclePreviousPanel", "HeadLookReset",
         ]
     elif args.routine == ROUTINE_SET_GAL_MAP_DESTINATION:
-        routine_actions = ["GalaxyMapOpen", "UI_Up", "UI_Select", "UI_Right", "UI_Down", "CamZoomIn"]
+        routine_actions = ["GalaxyMapOpen", "UI_Up", "UI_Select", "UI_Right"]
 
     runtime = build_runtime_context(loaded.config, actions=routine_actions)
     journal_dir = runtime.journal.effective_path
@@ -553,7 +550,7 @@ def main() -> int:
             _progress(f"  {_describe_binding(runtime.binding_lookup, action)}")
     elif args.routine == ROUTINE_SET_GAL_MAP_DESTINATION:
         _progress(f"Destination: {args.destination!r}")
-        for action in ["GalaxyMapOpen", "UI_Up", "UI_Select", "UI_Right", "UI_Down", "CamZoomIn"]:
+        for action in ["GalaxyMapOpen", "UI_Up", "UI_Select", "UI_Right"]:
             _progress(f"  {_describe_binding(runtime.binding_lookup, action)}")
 
     try:
@@ -668,7 +665,7 @@ def main() -> int:
                 search_settle_s=args.search_settle_seconds,
                 plot_settle_s=args.plot_settle_seconds,
                 step_delay_s=step_delay_seconds,
-                max_results=args.max_results,
+                select_hold_s=args.select_hold_seconds,
                 sleeper=logging_sleeper,
                 progress_fn=_progress,
             )

@@ -548,19 +548,15 @@ class GalMapDestinationTests(unittest.TestCase):
         controls: FakeShipControls,
         destination: str,
         journal_dir: Path,
-        open_settle_s: float = 0.0,
-        search_settle_s: float = 0.0,
-        plot_settle_s: float = 0.0,
-        step_delay_s: float = 0.0,
     ) -> RoutineResult:
         return set_gal_map_destination(
             controls,
             destination=destination,
             journal_dir=journal_dir,
-            open_settle_s=open_settle_s,
-            search_settle_s=search_settle_s,
-            plot_settle_s=plot_settle_s,
-            step_delay_s=step_delay_s,
+            open_settle_s=0.0,
+            search_settle_s=0.0,
+            plot_settle_s=0.0,
+            step_delay_s=0.0,
             sleeper=lambda _: None,
         )
 
@@ -575,12 +571,11 @@ class GalMapDestinationTests(unittest.TestCase):
         self.assertEqual(result.dispatch.status, "ok")
         self.assertEqual(result.details["destination"], "Colonia")
         self.assertEqual(result.details["actual"], "Colonia")
-        self.assertEqual(result.details["attempts"], 1)
 
         actions = [c["action"] for c in controls.calls]
         self.assertEqual(actions[0], "GalaxyMapOpen")
         self.assertIn("UI_Up", actions)
-        self.assertIn("CamZoomIn", actions)
+        self.assertNotIn("CamZoomIn", actions)
         self.assertEqual(actions[-1], "GalaxyMapOpen")
 
     def test_types_destination_then_enter(self) -> None:
@@ -596,7 +591,7 @@ class GalMapDestinationTests(unittest.TestCase):
         self.assertIn("Sagittarius A*", texts)
         self.assertIn("\n", texts)
 
-    def test_first_result_sequence(self) -> None:
+    def test_select_sequence_is_ui_right_then_held_select(self) -> None:
         controls = _make_gal_map_controls()
         with tempfile.TemporaryDirectory() as tmpdir:
             journal_dir = Path(tmpdir)
@@ -605,56 +600,31 @@ class GalMapDestinationTests(unittest.TestCase):
             self._run(controls, "Sol", journal_dir)
 
         actions = [c["action"] for c in controls.calls]
-        # After search: UI_Right then UI_Select before CamZoomIn
-        cam_idx = actions.index("CamZoomIn")
-        self.assertEqual(actions[cam_idx - 1], "UI_Select")
-        self.assertEqual(actions[cam_idx - 2], "UI_Right")
+        right_idx = actions.index("UI_Right")
+        # UI_Select with hold immediately follows UI_Right
+        self.assertEqual(actions[right_idx + 1], "UI_Select")
+        select_call = controls.calls[right_idx + 1]
+        self.assertGreater(select_call["hold_s"], 0)
 
-    def test_retry_on_mismatch_uses_ui_down(self) -> None:
+    def test_mismatch_returns_error_and_closes_map(self) -> None:
         controls = _make_gal_map_controls()
         with tempfile.TemporaryDirectory() as tmpdir:
             journal_dir = Path(tmpdir)
-            # NavRoute always points to wrong system -- all attempts will fail
             _write_navroute(journal_dir, "Wrong System")
 
-            result = set_gal_map_destination(
-                controls,
-                destination="Target",
-                journal_dir=journal_dir,
-                open_settle_s=0.0,
-                search_settle_s=0.0,
-                plot_settle_s=0.0,
-                step_delay_s=0.0,
-                max_results=3,
-                sleeper=lambda _: None,
-            )
+            result = self._run(controls, "Target", journal_dir)
 
         self.assertEqual(result.dispatch.status, "error")
-        # Should have tried UI_Down on attempts 2 and 3
-        down_calls = [c for c in controls.calls if c["action"] == "UI_Down"]
-        self.assertEqual(len(down_calls), 2)
-
-    def test_closes_map_on_failure(self) -> None:
-        controls = _make_gal_map_controls()
-        with tempfile.TemporaryDirectory() as tmpdir:
-            journal_dir = Path(tmpdir)
-            _write_navroute(journal_dir, "Nope")
-
-            set_gal_map_destination(
-                controls,
-                destination="Somewhere",
-                journal_dir=journal_dir,
-                open_settle_s=0.0,
-                search_settle_s=0.0,
-                plot_settle_s=0.0,
-                step_delay_s=0.0,
-                max_results=1,
-                sleeper=lambda _: None,
-            )
-
-        # Last action should be GalaxyMapOpen (close)
         actions = [c["action"] for c in controls.calls]
         self.assertEqual(actions[-1], "GalaxyMapOpen")
+        self.assertNotIn("UI_Down", actions)
+
+    def test_missing_navroute_returns_error(self) -> None:
+        controls = _make_gal_map_controls()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = self._run(controls, "Sol", Path(tmpdir))
+
+        self.assertEqual(result.dispatch.status, "error")
 
     def test_case_insensitive_match(self) -> None:
         controls = _make_gal_map_controls()
@@ -665,38 +635,6 @@ class GalMapDestinationTests(unittest.TestCase):
             result = self._run(controls, "colonia", journal_dir)
 
         self.assertEqual(result.dispatch.status, "ok")
-
-    def test_missing_navroute_counts_as_mismatch(self) -> None:
-        controls = _make_gal_map_controls()
-        with tempfile.TemporaryDirectory() as tmpdir:
-            journal_dir = Path(tmpdir)
-            # No NavRoute.json written
-
-            result = set_gal_map_destination(
-                controls,
-                destination="Sol",
-                journal_dir=journal_dir,
-                open_settle_s=0.0,
-                search_settle_s=0.0,
-                plot_settle_s=0.0,
-                step_delay_s=0.0,
-                max_results=1,
-                sleeper=lambda _: None,
-            )
-
-        self.assertEqual(result.dispatch.status, "error")
-
-    def test_rejects_max_results_zero(self) -> None:
-        controls = _make_gal_map_controls()
-        with tempfile.TemporaryDirectory() as tmpdir:
-            with self.assertRaises(ValueError):
-                set_gal_map_destination(
-                    controls,
-                    destination="Sol",
-                    journal_dir=Path(tmpdir),
-                    max_results=0,
-                    sleeper=lambda _: None,
-                )
 
     def test_open_check_fn_polled_until_true(self) -> None:
         controls = _make_gal_map_controls()
