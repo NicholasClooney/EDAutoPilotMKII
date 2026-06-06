@@ -86,7 +86,11 @@ These are not scheduled yet but worth capturing for planning.
 - **Galaxy map input.** Drive the in-game galaxy map to type a destination system name procedurally, replacing manual system selection. Would unlock fully automated route setting.
 - **Market trading.** Read commodity data from journal/market logs, then drive buy/sell menus via procedural input sequences to automate trade runs.
 - **Human-like input variation.** Add randomized dwell and inter-key delay variation to all synthetic input so sequences look less robotic. For menu-heavy flows (market buy/sell), include occasional overshoot-and-correct behavior (navigate past item, back up) to mimic human selection patterns.
-- **Monitoring and command center CLI.** A multi-panel terminal UI showing: ship and commander status (location, credits, cargo) in one panel, and a concise running log in another (docked at X, refueled, bought N units of Y, etc.). Likely built on `rich` or `textual`.
+- **Monitoring and command center CLI.** A multi-panel terminal UI, likely built on `rich` or `textual`, with:
+  - Ship and commander status panel: current system, station, credits, cargo fill, fuel level.
+  - Concise activity log panel: timestamped one-liners (docked at X, refueled, bought N units of Y, jumped to Z).
+  - Market tracker panel: persists commodity data scraped from journal/market events across every station visited this session. Tracks supply volume and price for target items per station so you can compare at a glance. A CLI command (e.g. `go <station>`) triggers the galaxy map routine to route to a better-stocked station.
+  - Command input: type commands while the autopilot runs without interrupting the display.
 
 - Next task in 0003: `undock` is live-validated. `refuel` is the only remaining routine; it remains intentionally deferred.
 - `refuel` is intentionally deferred for now.
