@@ -294,6 +294,11 @@ def main() -> int:
         help="Maximum time to wait for MarketBuy/MarketSell journal event",
     )
     parser.add_argument(
+        "--skip-station-check",
+        action="store_true",
+        help="Skip Market.json station verification (useful for testing)",
+    )
+    parser.add_argument(
         "--log-events",
         action="store_true",
         help="Log all watched journal events to a file while the routine runs",
@@ -585,6 +590,7 @@ def main() -> int:
                 step_delay_s=step_delay_seconds,
                 max_hold_s=args.max_hold_seconds,
                 trade_timeout_s=args.trade_timeout_seconds,
+                skip_station_check=args.skip_station_check,
                 sleeper=logging_sleeper,
                 progress_fn=_progress,
             )
@@ -598,6 +604,7 @@ def main() -> int:
                 step_delay_s=step_delay_seconds,
                 max_hold_s=args.max_hold_seconds,
                 trade_timeout_s=args.trade_timeout_seconds,
+                skip_station_check=args.skip_station_check,
                 sleeper=logging_sleeper,
                 progress_fn=_progress,
             )
