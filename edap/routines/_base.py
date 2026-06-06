@@ -100,6 +100,9 @@ class SupportsGalaxyMapControls(Protocol):
     def type_text(self, text: str) -> None:
         """Type a string of text character by character."""
 
+    def submit_text(self, repeat: int = 1, hold_s: float = 0.0) -> ActionDispatchResult:
+        """Submit the current text entry, typically via Enter/Return."""
+
 
 class SupportsHaulControls(SupportsDockingControls, SupportsUndockControls, SupportsMarketControls, SupportsGalaxyMapControls, Protocol):
     """Combined protocol for all controls needed in the haul loop."""

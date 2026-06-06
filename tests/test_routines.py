@@ -90,6 +90,10 @@ class FakeShipControls:
     def type_text(self, text: str) -> None:
         self.calls.append({"action": "type_text", "text": text})
 
+    def submit_text(self, repeat: int = 1, hold_s: float = 0.0) -> ActionDispatchResult:
+        self.calls.append({"action": "Enter", "repeat": repeat, "hold_s": hold_s})
+        return self._set_speed_zero_result
+
 
 class FakeWatcher:
     def __init__(self, batches: list[list[dict[str, object]]]) -> None:
@@ -575,7 +579,7 @@ class GalMapDestinationTests(unittest.TestCase):
         actions = [c["action"] for c in controls.calls]
         self.assertEqual(actions[0], "GalaxyMapOpen")
         self.assertIn("UI_Up", actions)
-        self.assertNotIn("CamZoomIn", actions)
+        self.assertIn("CamZoomIn", actions)
         self.assertEqual(actions[-1], "GalaxyMapOpen")
 
     def test_types_destination_then_enter(self) -> None:
@@ -589,9 +593,11 @@ class GalMapDestinationTests(unittest.TestCase):
         text_calls = [c for c in controls.calls if c["action"] == "type_text"]
         texts = [c["text"] for c in text_calls]
         self.assertIn("Sagittarius A*", texts)
-        self.assertIn("\n", texts)
+        enter_calls = [c for c in controls.calls if c["action"] == "Enter"]
+        self.assertEqual(len(enter_calls), 1)
+        self.assertGreater(enter_calls[0]["hold_s"], 0)
 
-    def test_select_sequence_is_ui_right_then_held_select(self) -> None:
+    def test_select_sequence_matches_odyssey_flow(self) -> None:
         controls = _make_gal_map_controls()
         with tempfile.TemporaryDirectory() as tmpdir:
             journal_dir = Path(tmpdir)
@@ -601,9 +607,11 @@ class GalMapDestinationTests(unittest.TestCase):
 
         actions = [c["action"] for c in controls.calls]
         right_idx = actions.index("UI_Right")
-        # UI_Select with hold immediately follows UI_Right
         self.assertEqual(actions[right_idx + 1], "UI_Select")
-        select_call = controls.calls[right_idx + 1]
+        self.assertEqual(actions[right_idx + 2], "CamZoomIn")
+        # Held UI_Select immediately follows CamZoomIn
+        self.assertEqual(actions[right_idx + 3], "UI_Select")
+        select_call = controls.calls[right_idx + 3]
         self.assertGreater(select_call["hold_s"], 0)
 
     def test_mismatch_returns_error_and_closes_map(self) -> None:

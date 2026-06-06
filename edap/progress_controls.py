@@ -96,3 +96,7 @@ class ProgressShipControls:
         if self._verbose:
             self._progress(f"  type_text: {text!r}")
         self._controls.type_text(text)
+
+    def submit_text(self, repeat: int = 1, hold_s: float | None = None) -> ActionDispatchResult:
+        self._log("Enter", repeat)
+        return self._controls.submit_text(repeat=repeat, hold_s=hold_s)

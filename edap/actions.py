@@ -54,6 +54,22 @@ class ActionDispatcher:
     def type_text(self, text: str, char_delay_s: float = 0.05) -> None:
         self._input_controller.type_text(text, char_delay_s=char_delay_s)
 
+    def tap_key(self, key: str, modifier: str | None = None, repeat: int = 1, hold_s: float = 0.0) -> ActionDispatchResult:
+        if repeat < 1:
+            raise ValueError("repeat must be at least 1")
+        if hold_s < 0:
+            raise ValueError("hold_s must be non-negative")
+
+        for _ in range(repeat):
+            self._input_controller.tap_key(key, modifier=modifier, hold_s=hold_s)
+        return ActionDispatchResult(
+            action=f"raw:{key}",
+            status="ok",
+            binding=NormalizedBinding(key=key, modifier=modifier),
+            repeat=repeat,
+            hold_s=hold_s,
+        )
+
     def _result_from_lookup(
         self,
         resolved: BindingLookupResult,

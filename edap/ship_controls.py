@@ -216,3 +216,6 @@ class ShipControls:
 
     def type_text(self, text: str, char_delay_s: float = 0.05) -> None:
         self._dispatcher.type_text(text, char_delay_s=char_delay_s)
+
+    def submit_text(self, repeat: int = 1, hold_s: float = 0.2) -> ActionDispatchResult:
+        return self._dispatcher.tap_key("enter", repeat=repeat, hold_s=hold_s)

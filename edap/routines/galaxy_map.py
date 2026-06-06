@@ -33,6 +33,7 @@ def set_gal_map_destination(
     search_settle_s: float = 2.0,
     plot_settle_s: float = 2.0,
     step_delay_s: float = 0.5,
+    search_commit_hold_s: float = 0.2,
     select_hold_s: float = 5.0,
     time_fn: Callable[[], float] = monotonic,
     sleeper: Callable[[float], None] = sleep,
@@ -84,7 +85,7 @@ def set_gal_map_destination(
     if step_delay_s > 0:
         sleeper(step_delay_s)
 
-    # Step 4: type destination + Enter to commit search
+    # Step 4: type destination + held Enter to commit search
     if progress_fn is not None:
         progress_fn(f"Typing destination: {destination!r}")
     controls.type_text(destination)
@@ -92,17 +93,33 @@ def set_gal_map_destination(
         sleeper(step_delay_s)
 
     if progress_fn is not None:
-        progress_fn("Committing search (Enter)...")
-    controls.type_text("\n")
+        progress_fn(f"Committing search (Enter held {search_commit_hold_s:.1f}s)...")
+    dispatch = controls.submit_text(hold_s=search_commit_hold_s)
+    if dispatch.status != "ok":
+        return RoutineResult(action="Enter", dispatch=dispatch, details={"phase": "commit_search"})
     if search_settle_s > 0:
         sleeper(search_settle_s)
 
-    # Step 5: UI_Right then hold UI_Select to select result and plot route
+    # Step 5: select the first result, then zoom/confirm plot
     if progress_fn is not None:
         progress_fn("Selecting result...")
     dispatch = controls.ui_right()
     if dispatch.status != "ok":
         return RoutineResult(action="UI_Right", dispatch=dispatch, details={"phase": "select_result"})
+    if step_delay_s > 0:
+        sleeper(step_delay_s)
+
+    dispatch = controls.ui_select()
+    if dispatch.status != "ok":
+        return RoutineResult(action="UI_Select", dispatch=dispatch, details={"phase": "select_result"})
+    if step_delay_s > 0:
+        sleeper(step_delay_s)
+
+    if progress_fn is not None:
+        progress_fn("Zooming to plot route...")
+    dispatch = controls.cam_zoom_in()
+    if dispatch.status != "ok":
+        return RoutineResult(action="CamZoomIn", dispatch=dispatch, details={"phase": "prepare_plot"})
     if step_delay_s > 0:
         sleeper(step_delay_s)
 
