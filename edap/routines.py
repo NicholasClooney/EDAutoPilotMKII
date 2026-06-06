@@ -742,7 +742,7 @@ def _market_trade(
     if dispatch.status != "ok":
         return RoutineResult(action=dispatch.action, dispatch=dispatch, details={"phase": "navigate_to_market"})
     # Station services UI takes a moment to populate after selection
-    sleeper(3.0)
+    sleeper(7.0)
 
     for fn, label in [
         (controls.ui_down, "UI_Down (to commodities market)"),
