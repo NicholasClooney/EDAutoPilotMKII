@@ -63,16 +63,27 @@ A session-level dict keyed by `MarketID` stores the last-seen Market.json snapsh
 
 ## Open Questions (gate implementation)
 
-These must be answered from a live session before writing the routine. Use `scratch_market.py` to help answer #1.
+These must be answered from a live session before writing the routine.
 
 1. **Does the in-game market list order match the order of items in Market.json?**
-   If yes, positional navigation (scroll N times) is reliable. If not, we need a different selection strategy.
+   **Answered (2026-06-06).** The in-game market sorts categories alphabetically and items within each category alphabetically. `scratch_market.py` now mirrors this layout. Positional navigation must use the same alphabetical order, not raw Market.json order.
 
 2. **Does the game accept typed numeric input for quantity, or is it increment/decrement only?**
-   If typed input works, large quantities are fast. If scroll-only, we need a key-repeat approach for large buys.
+   **Answered (2026-06-06).** Increment/decrement only via `UI_Right` / `UI_Left`. Holding accelerates to max. For `amount == "MAX"`, hold `UI_Right` for 10 seconds; for a specific count, tap `UI_Right` N times.
 
 3. **What is the exact UI key path from the docked lobby to the commodities buy tab?**
-   Need to trace: station services menu key → commodities entry → buy tab. The existing dock routine only goes as far as the station lobby.
+   **Answered (2026-06-06).** Starting from the station services screen (where the refuel routine leaves off):
+   - `UI_Select` — enter station services
+   - `UI_Down` — move to Commodities Market entry
+   - `UI_Select` — open market; lands on BUY tab with sidebar focus
+   - `UI_Right` — enter the commodity list (cursor on first item)
+   - `UI_Down` x N — navigate to target item (category headers are non-navigable separators)
+   - `UI_Select` — open buy/sell dialog
+   - `UI_Right` (hold 10s or tap N times) — set quantity
+   - `UI_Down` — move to BUY button
+   - `UI_Select` — confirm
+   For SELL tab: after opening the market, press `UI_Down` (sidebar BUY → SELL), `UI_Select` to enter SELL, then same flow.
+   Exiting the commodity screen returns to the station services Missions entry.
 
 ## Dependencies
 

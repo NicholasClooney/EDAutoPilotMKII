@@ -9,7 +9,7 @@ from time import sleep
 
 from edap.binding_lookup import BindingLookup
 from edap.config import ConfigError, DEFAULT_CONFIG_PATH
-from edap.routines import auto_zero_throttle_on_arrival, dock, jump, station_refuel_menu, undock
+from edap.routines import auto_zero_throttle_on_arrival, dock, jump, market_buy, market_sell, station_refuel_menu, undock
 from edap.runtime import build_runtime_context, load_config_with_fallback
 from edap.ship_controls import ShipControls
 from edap.state import JournalWatcher
@@ -20,7 +20,17 @@ ROUTINE_JUMP = "jump"
 ROUTINE_DOCK = "dock"
 ROUTINE_STATION_REFUEL_MENU = "station_refuel_menu"
 ROUTINE_UNDOCK = "undock"
-SUPPORTED_ROUTINES = [ROUTINE_AUTO_ZERO_THROTTLE_ON_ARRIVAL, ROUTINE_JUMP, ROUTINE_DOCK, ROUTINE_STATION_REFUEL_MENU, ROUTINE_UNDOCK]
+ROUTINE_MARKET_BUY = "market_buy"
+ROUTINE_MARKET_SELL = "market_sell"
+SUPPORTED_ROUTINES = [
+    ROUTINE_AUTO_ZERO_THROTTLE_ON_ARRIVAL,
+    ROUTINE_JUMP,
+    ROUTINE_DOCK,
+    ROUTINE_STATION_REFUEL_MENU,
+    ROUTINE_UNDOCK,
+    ROUTINE_MARKET_BUY,
+    ROUTINE_MARKET_SELL,
+]
 DEFAULT_EVENT_LOG_PATH = Path("artifacts/run-routine-events.log")
 
 
@@ -262,6 +272,28 @@ def main() -> int:
         help="Maximum time to wait for Undocked event after sending the launch command",
     )
     parser.add_argument(
+        "--target",
+        metavar="COMMODITY",
+        help="Commodity name for market_buy/market_sell (case-insensitive, must match Name_Localised in Market.json)",
+    )
+    parser.add_argument(
+        "--amount",
+        metavar="N|MAX",
+        help="Quantity to buy/sell: a positive integer or MAX (holds UI_Right for --max-hold-seconds)",
+    )
+    parser.add_argument(
+        "--max-hold-seconds",
+        type=float,
+        default=10.0,
+        help="Seconds to hold UI_Right when --amount MAX (default 10)",
+    )
+    parser.add_argument(
+        "--trade-timeout-seconds",
+        type=float,
+        default=30.0,
+        help="Maximum time to wait for MarketBuy/MarketSell journal event",
+    )
+    parser.add_argument(
         "--log-events",
         action="store_true",
         help="Log all watched journal events to a file while the routine runs",
@@ -329,6 +361,31 @@ def main() -> int:
     if args.undock_timeout_seconds < 0:
         sys.stderr.write("Invalid routine request: --undock-timeout-seconds must be non-negative\n")
         return 2
+    if args.max_hold_seconds < 0:
+        sys.stderr.write("Invalid routine request: --max-hold-seconds must be non-negative\n")
+        return 2
+    if args.trade_timeout_seconds < 0:
+        sys.stderr.write("Invalid routine request: --trade-timeout-seconds must be non-negative\n")
+        return 2
+
+    parsed_amount: int | str | None = None
+    if args.routine in {ROUTINE_MARKET_BUY, ROUTINE_MARKET_SELL}:
+        if not args.target:
+            sys.stderr.write("--target is required for market_buy and market_sell\n")
+            return 2
+        if not args.amount:
+            sys.stderr.write("--amount is required for market_buy and market_sell (positive integer or MAX)\n")
+            return 2
+        if args.amount.upper() == "MAX":
+            parsed_amount = "MAX"
+        else:
+            try:
+                parsed_amount = int(args.amount)
+                if parsed_amount < 1:
+                    raise ValueError
+            except ValueError:
+                sys.stderr.write("--amount must be a positive integer or MAX\n")
+                return 2
 
     routine_actions = ["SetSpeedZero"]
     if args.routine == ROUTINE_JUMP:
@@ -351,6 +408,8 @@ def main() -> int:
         routine_actions = ["UI_Up", "UI_Select", "UI_Down"]
     elif args.routine == ROUTINE_UNDOCK:
         routine_actions = ["UI_Back", "HeadLookReset", "UI_Down", "UI_Select"]
+    elif args.routine in {ROUTINE_MARKET_BUY, ROUTINE_MARKET_SELL}:
+        routine_actions = ["UI_Select", "UI_Down", "UI_Right"]
 
     runtime = build_runtime_context(loaded.config, actions=routine_actions)
     journal_dir = runtime.journal.effective_path
@@ -361,6 +420,8 @@ def main() -> int:
         ROUTINE_DOCK,
         ROUTINE_STATION_REFUEL_MENU,
         ROUTINE_UNDOCK,
+        ROUTINE_MARKET_BUY,
+        ROUTINE_MARKET_SELL,
     }
     if routine_needs_journal and journal_dir is None:
         sys.stderr.write(
@@ -419,6 +480,8 @@ def main() -> int:
             watch_target = "Docked events"
         elif args.routine == ROUTINE_UNDOCK:
             watch_target = "Undocked events"
+        elif args.routine in {ROUTINE_MARKET_BUY, ROUTINE_MARKET_SELL}:
+            watch_target = "MarketBuy/MarketSell events"
         _progress(
             f"Watching {journal_dir} for {watch_target} "
             f"(poll {args.poll_interval_seconds:.2f}s)."
@@ -454,6 +517,9 @@ def main() -> int:
         _progress(f"  {_describe_binding(runtime.binding_lookup, 'UI_Down')}")
     elif args.routine == ROUTINE_UNDOCK:
         for action in ["UI_Back", "HeadLookReset", "UI_Down", "UI_Select"]:
+            _progress(f"  {_describe_binding(runtime.binding_lookup, action)}")
+    elif args.routine in {ROUTINE_MARKET_BUY, ROUTINE_MARKET_SELL}:
+        for action in ["UI_Select", "UI_Down", "UI_Right"]:
             _progress(f"  {_describe_binding(runtime.binding_lookup, action)}")
 
     try:
@@ -506,6 +572,32 @@ def main() -> int:
                 watcher,
                 undock_timeout_s=args.undock_timeout_seconds,
                 step_delay_s=step_delay_seconds,
+                sleeper=logging_sleeper,
+                progress_fn=_progress,
+            )
+        elif args.routine == ROUTINE_MARKET_BUY:
+            result = market_buy(
+                logging_controls,
+                watcher,
+                market_path=journal_dir / "Market.json",
+                target=args.target,
+                amount=parsed_amount,
+                step_delay_s=step_delay_seconds,
+                max_hold_s=args.max_hold_seconds,
+                trade_timeout_s=args.trade_timeout_seconds,
+                sleeper=logging_sleeper,
+                progress_fn=_progress,
+            )
+        elif args.routine == ROUTINE_MARKET_SELL:
+            result = market_sell(
+                logging_controls,
+                watcher,
+                market_path=journal_dir / "Market.json",
+                target=args.target,
+                amount=parsed_amount,
+                step_delay_s=step_delay_seconds,
+                max_hold_s=args.max_hold_seconds,
+                trade_timeout_s=args.trade_timeout_seconds,
                 sleeper=logging_sleeper,
                 progress_fn=_progress,
             )

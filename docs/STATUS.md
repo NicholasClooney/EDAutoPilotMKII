@@ -2,7 +2,7 @@
 
 _This is the maintained status document for the repo. Update it at the end of each session when project understanding, port status, or next steps change. Keep it current over time rather than treating it as a frozen checkpoint._
 
-Last updated: 2026-06-05 (session 2)
+Last updated: 2026-06-06 (session 3)
 
 ## Where We Are
 
@@ -59,8 +59,8 @@ The important caveat is that the real autopilot loop is still largely unported. 
 | Station / docked state detection | Partial | `edap/state.py` derives coarse statuses like `in_station`, `starting_docking`, and `in_docking`, but there is no dedicated docked/station snapshot model yet |
 | Hotkey registration | Parked | `keyboard` lib doesn't work on macOS; likely future direction is a menu-bar app |
 | Legacy autopilot loop migration | Not ported | `dev_autopilot.py` remains the behavior reference; new `edap/` routines are still minimal |
-| Market data reading | Done | `scratch_market.py` — reads `Market.json` from journal dir, displays commodity table with buy/sell/stock/demand; run while market screen is open in-game |
-| Market buy/sell routine | Not started | Designed in `docs/plans/0005-market-trading-routine.md`; gated on 3 open questions (list order vs Market.json order, qty input method, UI path to commodities) |
+| Market data reading | Done | `scratch_market.py` — reads `Market.json` from journal dir, mirrors in-game layout (alphabetical categories, alphabetical items within each); `--raw` flat table with sort options |
+| Market buy/sell routine | Done (not live-validated) | `edap/routines.py` — `market_buy` / `market_sell` wired to `run_routine.py` with `--target` / `--amount` / `--step-delay-seconds`; all 3 open questions answered; station guard cross-references Market.json MarketID against last Docked journal event (3 retries, 10s apart); awaiting first live test run |
 
 ## Unverified on macOS / CrossOver
 
@@ -97,6 +97,7 @@ These are not scheduled yet but worth capturing for planning.
 
 - Next task in 0003: `undock` is live-validated. `refuel` is the only remaining routine; it remains intentionally deferred.
 - `refuel` is intentionally deferred for now.
+- Next task for 0005: live-validate `market_buy` and `market_sell` with `--step-delay-seconds 2` (slow run) to confirm UI path and navigation counts. First test: `--routine market_buy --target Aluminium --amount MAX --step-delay-seconds 2 --delay-seconds 5`.
 - Next task in 0002: re-bake `templates/compass.png` from a live capture. Run `uv run python3 scratch_cv.py --config config.toml --save-raw /tmp/cv-raw.png`, then crop the compass from the raw frame.
 - Destination template needs a supercruise test before deciding whether it also needs re-baking.
 - Then: use plan 0004 to measure capture-loop performance and journal latency.
