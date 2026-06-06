@@ -732,56 +732,7 @@ def _market_trade(
 ) -> RoutineResult:
     event_type = "MarketBuy" if side == "buy" else "MarketSell"
 
-    # Verify Market.json exists and matches the current docked station.
-    # Retries up to 3 times, 10s apart, in case the file has not been written yet.
-    _RETRIES = 3
-    _RETRY_DELAY_S = 10.0
-    data: dict = {}
-    for attempt in range(1, _RETRIES + 1):
-        fail_reason: str | None = None
-        if not market_path.exists():
-            fail_reason = "Market.json not found -- open the commodities market in-game first"
-        else:
-            with market_path.open() as fh:
-                data = json.load(fh)
-            docked = _read_last_docked_event(market_path.parent)
-            if docked is None:
-                fail_reason = "no Docked event found in journal -- cannot verify current station"
-            else:
-                market_id = data.get("MarketID")
-                docked_id = docked.get("MarketID")
-                if market_id and docked_id and market_id == docked_id:
-                    pass  # confirmed match
-                elif data.get("StationName") and data.get("StationName") == docked.get("StationName"):
-                    pass  # fallback name match
-                else:
-                    fail_reason = (
-                        f"Market.json is from {data.get('StationName', '?')!r} "
-                        f"but last Docked event is {docked.get('StationName', '?')!r} -- "
-                        "open the market screen in-game to refresh it"
-                    )
-        if fail_reason is None:
-            break
-        if attempt < _RETRIES:
-            if progress_fn is not None:
-                progress_fn(f"Station check failed (attempt {attempt}/{_RETRIES}): {fail_reason}")
-                progress_fn(f"  Retrying in {_RETRY_DELAY_S:.0f}s...")
-            sleeper(_RETRY_DELAY_S)
-        else:
-            return _market_error(event_type, f"Station check failed after {_RETRIES} attempts: {fail_reason}")
-
-    items: list[dict] = data.get("Items", [])
-
-    sorted_items = _market_buy_list(items) if side == "buy" else _market_sell_list(items)
-    try:
-        item_index = _market_item_index(sorted_items, target)
-    except ValueError as exc:
-        return _market_error(event_type, str(exc))
-
-    if progress_fn is not None:
-        progress_fn(f"Target '{target}' at position {item_index} in {side} list ({len(sorted_items)} items)")
-
-    # Navigate from station services to commodities market
+    # Navigate to commodities market first -- the game writes Market.json when the screen opens
     if progress_fn is not None:
         progress_fn("Navigating to commodities market...")
 
@@ -804,6 +755,54 @@ def _market_trade(
             return RoutineResult(action=dispatch.action, dispatch=dispatch, details={"phase": "navigate_to_market"})
         if step_delay_s > 0:
             sleeper(step_delay_s)
+
+    # Now verify Market.json -- the game should have written it when the market screen opened.
+    # Retry up to 3 times, 10s apart, in case the write is slightly delayed.
+    _RETRIES = 3
+    _RETRY_DELAY_S = 10.0
+    data: dict = {}
+    for attempt in range(1, _RETRIES + 1):
+        fail_reason: str | None = None
+        if not market_path.exists():
+            fail_reason = "Market.json not found"
+        else:
+            with market_path.open() as fh:
+                data = json.load(fh)
+            docked = _read_last_docked_event(market_path.parent)
+            if docked is None:
+                fail_reason = "no Docked event found in journal -- cannot verify current station"
+            else:
+                market_id = data.get("MarketID")
+                docked_id = docked.get("MarketID")
+                if market_id and docked_id and market_id == docked_id:
+                    pass  # confirmed match
+                elif data.get("StationName") and data.get("StationName") == docked.get("StationName"):
+                    pass  # fallback name match
+                else:
+                    fail_reason = (
+                        f"Market.json is from {data.get('StationName', '?')!r} "
+                        f"but last Docked event is {docked.get('StationName', '?')!r}"
+                    )
+        if fail_reason is None:
+            break
+        if attempt < _RETRIES:
+            if progress_fn is not None:
+                progress_fn(f"Station check failed (attempt {attempt}/{_RETRIES}): {fail_reason}")
+                progress_fn(f"  Retrying in {_RETRY_DELAY_S:.0f}s...")
+            sleeper(_RETRY_DELAY_S)
+        else:
+            return _market_error(event_type, f"Station check failed after {_RETRIES} attempts: {fail_reason}")
+
+    items: list[dict] = data.get("Items", [])
+
+    sorted_items = _market_buy_list(items) if side == "buy" else _market_sell_list(items)
+    try:
+        item_index = _market_item_index(sorted_items, target)
+    except ValueError as exc:
+        return _market_error(event_type, str(exc))
+
+    if progress_fn is not None:
+        progress_fn(f"Target '{target}' at position {item_index} in {side} list ({len(sorted_items)} items)")
 
     # For sell: navigate sidebar from BUY to SELL tab before entering the list
     if side == "sell":
