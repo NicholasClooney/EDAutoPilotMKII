@@ -11,6 +11,7 @@ Usage:
     uv run python3 scratch_market.py --config config.toml
     uv run python3 scratch_market.py --config config.toml --filter gold
     uv run python3 scratch_market.py --config config.toml --sort buy
+    uv run python3 scratch_market.py --config config.toml --sort raw
     uv run python3 scratch_market.py --config config.toml --in-stock
 """
 from __future__ import annotations
@@ -39,9 +40,9 @@ def main() -> None:
     parser.add_argument("--filter", metavar="TERM", help="case-insensitive substring filter on commodity name")
     parser.add_argument(
         "--sort",
-        choices=["name", "buy", "sell", "stock", "demand", "category"],
+        choices=["name", "buy", "sell", "stock", "demand", "category", "raw"],
         default="name",
-        help="sort column (default: name)",
+        help="sort column; 'raw' preserves Market.json order (default: name)",
     )
     parser.add_argument("--in-stock", action="store_true", help="only show items with stock > 0")
     parser.add_argument("--wanted", action="store_true", help="only show items with demand > 0")
@@ -101,15 +102,16 @@ def main() -> None:
 
         rows.append((name, category, buy, sell, stock, stock_bracket, demand, demand_bracket))
 
-    sort_key = {
-        "name": lambda r: r[0].lower(),
-        "category": lambda r: (r[1].lower(), r[0].lower()),
-        "buy": lambda r: (-r[2], r[0].lower()),
-        "sell": lambda r: (-r[3], r[0].lower()),
-        "stock": lambda r: (-r[4], r[0].lower()),
-        "demand": lambda r: (-r[6], r[0].lower()),
-    }[args.sort]
-    rows.sort(key=sort_key)
+    if args.sort != "raw":
+        sort_key = {
+            "name": lambda r: r[0].lower(),
+            "category": lambda r: (r[1].lower(), r[0].lower()),
+            "buy": lambda r: (-r[2], r[0].lower()),
+            "sell": lambda r: (-r[3], r[0].lower()),
+            "stock": lambda r: (-r[4], r[0].lower()),
+            "demand": lambda r: (-r[6], r[0].lower()),
+        }[args.sort]
+        rows.sort(key=sort_key)
 
     if not rows:
         print("No items match the current filters.")
