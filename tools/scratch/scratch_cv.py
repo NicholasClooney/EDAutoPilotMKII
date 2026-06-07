@@ -10,9 +10,9 @@ conversion is applied once after capture (RGB→BGR). All cv2 operations
 below work on BGR arrays.
 
 Usage:
-    python3 scratch_cv.py --config config.toml
-    python3 scratch_cv.py --config config.toml --save-debug /tmp/cv-debug.png
-    python3 scratch_cv.py --config config.toml --save-debug /tmp/cv-debug.png --save-raw /tmp/cv-raw.png
+    uv run python3 tools/scratch/scratch_cv.py --config config.toml
+    uv run python3 tools/scratch/scratch_cv.py --config config.toml --save-debug /tmp/cv-debug.png
+    uv run python3 tools/scratch/scratch_cv.py --config config.toml --save-debug /tmp/cv-debug.png --save-raw /tmp/cv-raw.png
 """
 from __future__ import annotations
 
@@ -22,6 +22,10 @@ from pathlib import Path
 
 import cv2
 import numpy as np
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 from edap.capture import PixelBounds, build_capture_layout
 from edap.runtime import build_runtime_context, load_config_with_fallback

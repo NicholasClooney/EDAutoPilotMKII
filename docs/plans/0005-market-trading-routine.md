@@ -27,7 +27,7 @@ Relevant fields per item:
 | `Demand` | Station demand for selling to it |
 | `DemandBracket` | Demand level 0–3 |
 
-`scratch_market.py` is the live probe for reading and inspecting this file.
+`tools/scratch/scratch_market.py` is the live probe for reading and inspecting this file.
 
 ### Journal events
 
@@ -66,7 +66,7 @@ A session-level dict keyed by `MarketID` stores the last-seen Market.json snapsh
 These must be answered from a live session before writing the routine.
 
 1. **Does the in-game market list order match the order of items in Market.json?**
-   **Answered (2026-06-06).** The in-game market sorts categories alphabetically and items within each category alphabetically. `scratch_market.py` now mirrors this layout. Positional navigation must use the same alphabetical order, not raw Market.json order.
+   **Answered (2026-06-06).** The in-game market sorts categories alphabetically and items within each category alphabetically. `tools/scratch/scratch_market.py` now mirrors this layout. Positional navigation must use the same alphabetical order, not raw Market.json order.
 
 2. **Does the game accept typed numeric input for quantity, or is it increment/decrement only?**
    **Answered (2026-06-06).** Increment/decrement only via `UI_Right` / `UI_Left`. Holding accelerates to max. For `amount == "MAX"`, hold `UI_Right` for 10 seconds; for a specific count, tap `UI_Right` N times.
@@ -87,7 +87,7 @@ These must be answered from a live session before writing the routine.
 
 ## Dependencies
 
-- `scratch_market.py` is the verification tool for assumption #1.
+- `tools/scratch/scratch_market.py` is the verification tool for assumption #1.
 - Plan 0003 (journal-driven routines) provides `JournalWatcher` which this routine needs for `MarketBuy`/`MarketSell` confirmation.
 - No CV dependency — navigation is positional, not screen-reading.
 

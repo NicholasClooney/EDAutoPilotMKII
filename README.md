@@ -1,261 +1,66 @@
 # EDAutopilot MK II
 
-Elite Dangerous autopilot experimentation using computer vision, journal parsing, and synthetic keyboard input.
+macOS-first Elite Dangerous automation tooling for CrossOver, with future Windows compatibility kept as a constraint rather than the current target.
 
-## Project Direction
+The current operator surface is [`control_room.py`](control_room.py). The project is not a full autopilot yet; it is a live runtime and routine stack built around journal parsing, bindings lookup, synthetic input, and early workflow automation.
 
-This repository started as a Windows-focused prototype. The current direction is different:
+See [docs/STATUS.md](docs/STATUS.md) for the maintained status, validation notes, and next recommended work.
 
-- primary target: macOS
-- game runtime: Elite Dangerous through CrossOver
-- design constraint: keep future Windows compatibility in mind
-- immediate goal: prove the platform/runtime plumbing before expanding autopilot behavior
+## Current Surface
 
-That means the project is still in a portability-first phase rather than a feature rewrite.
+What works today:
 
-## Current Status
+- macOS journal, bindings, screen-capture, and Quartz input plumbing
+- journal-driven `jump`, `dock`, `undock`, `buy`, `sell`, `haul`, and `dest` flows
+- a live Control Room TUI with ship status, activity log, market panel, replay history, and saved default haul setup
 
-See [docs/STATUS.md](docs/STATUS.md) for port status, what is stubbed, what is unverified, and which plan to pick up next.
-See [docs/manual-journal-routine-testing.md](docs/manual-journal-routine-testing.md) for the current live manual test flow for the first journal-driven routine.
+What is not done:
 
-Active plans:
+- the legacy CV-driven align loop is still not ported into the active runtime
+- the repo still needs a real tracked Control Room screenshot; the asset slot is reserved under `docs/assets/`
 
-- [docs/plans/0002-cv-pipeline-scaffold.md](docs/plans/0002-cv-pipeline-scaffold.md) — probe whether legacy CV templates match on macOS + CrossOver.
-- [docs/plans/0003-journal-driven-routines.md](docs/plans/0003-journal-driven-routines.md) — `JournalWatcher`, `jump`, `refuel`, `dock`, `undock`, `auto_zero_throttle_on_arrival`, plus a `run_routine.py` CLI.
-- [docs/plans/0004-runtime-diagnostics-dashboard.md](docs/plans/0004-runtime-diagnostics-dashboard.md) — capture benchmark, journal-latency probe, and a `rich.live` stats-for-nerds dashboard.
+## Primary Entrypoints
 
-## What `diagnostics.py` Is
+- `uv run python3 control_room.py --config config.toml`
+- `uv run python3 run_routine.py --config config.toml --routine haul_loop`
+- `uv run python3 diagnostics.py --config config.toml`
+- `uv run python3 ship_controls.py --config config.toml --action SetSpeedZero --delay-seconds 3`
 
-`diagnostics.py` is the diagnostic runner entry point.
+## Routine Overview
 
-It is a small command or mode that validates core prerequisites without attempting to fly the ship. For this project, that means checking config, journal parsing, bindings parsing, screen capture, and test input delivery.
+`haul` is the strongest current end-to-end routine. Around it, the active routine surface includes:
 
-## Legacy Code
+- `dock`
+- `undock`
+- `jump`
+- `buy`
+- `sell`
+- `dest`
 
-The original Windows-oriented implementation is still present as a behavior reference:
+These are built to be manually exercised against a live Elite session running through CrossOver, not left unattended.
 
-- `autopilot.py` — legacy app entry point
-- `dev_tray.py` — tray and hotkey behavior
-- `dev_autopilot.py` — most of the original logic
-- `src/directinput.py` — Windows-specific input code
+## Repo Layout
 
-Do not treat these as the target structure for the macOS-first version.
+- `control_room.py`, `run_routine.py`, `diagnostics.py`, `ship_controls.py`: active operator and validation entrypoints
+- `edap/`: active runtime code
+- `tools/scratch/`: exploratory probes and one-off validation helpers
+- `archive/legacy-windows/`: Windows-era behavior reference code, kept for historical context only
 
-## Diagnostics Usage
+## Docs Map
 
-Copy `config.example.toml` to `config.toml` and fill in the journal and bindings locations if auto-detection is not sufficient. Leaving either path blank tells diagnostics to try platform auto-detection.
-
-For capture settings, the current config supports:
-
-- concrete reference dimensions via `screen.resolution_width`, `screen.resolution_height`, and `screen.scale`
-- a base capture box via `screen.capture.left/top/right/bottom`
-- named normalized subregions via `screen.capture.regions.*`
-
-The normalized capture boxes are the forward-looking seam for later CV work. The reference dimensions are still the concrete values used by diagnostics today.
-
-Then run:
-
-```sh
-python3 diagnostics.py --config config.toml
-```
-
-Optional checks:
-
-```sh
-python3 diagnostics.py --config config.toml --capture-screen
-python3 diagnostics.py --config config.toml --send-test-key --test-key j
-python3 diagnostics.py --config config.toml --send-test-key --test-key j --delay-seconds 5 --repeat 3
-```
-
-Current behavior:
-
-- journal and bindings diagnostics are implemented
-- macOS path fallback discovery is implemented
-- diagnostics output distinguishes configured, auto-detected, and effective paths
-- diagnostics output includes the effective capture layout in normalized and pixel terms
-- screen capture diagnostic can save a debug image
-- macOS test input is wired through a native Quartz `CGEvent` backend (via `pyobjc-framework-Quartz`)
-
-On macOS, synthetic input and screen capture may require Accessibility or Screen Recording permissions depending on system settings.
-
-## Manual Utility Scripts
-
-Beyond `diagnostics.py`, five scripts are useful for watching journal traffic, poking at bindings, exercising single controls, and running the current journal-driven routines. All honor the same `--config` flag and reuse the shared runtime context where applicable.
-
-### `check_bindings.py`
-
-Verifies which Elite actions resolve to a usable binding for the current bindings file.
-
-```sh
-python3 check_bindings.py
-python3 check_bindings.py --verbose
-python3 check_bindings.py --json
-```
-
-The plain output reports required-binding coverage. `--verbose` adds optional bindings. `--json` emits a full structured payload that includes `all_supported` and `all_issues`, which is the easiest way to discover what key and modifier are bound to a given action.
-
-To inspect specific actions, pipe the JSON into `jq` or a small Python snippet:
-
-```sh
-python3 check_bindings.py --json | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['all_supported'].get('YawLeftButton'))"
-```
-
-### `watch_journal.py`
-
-Watches the live Elite journal through `JournalWatcher`, prints only a small filtered event set to stdout, and logs every raw event to `artifacts/journal-watcher.log`.
-
-```sh
-python3 watch_journal.py
-```
-
-This is the quickest way to confirm that the repo is seeing real-time journal transitions like `StartJump`, `SupercruiseEntry`, `SupercruiseExit`, and `FSDJump` on the current machine before testing a higher-level routine.
-
-### `ship_controls.py`
-
-Sends one or more ship-control actions through the binding lookup and the macOS input backend. Useful for confirming that a key actually reaches the in-game cockpit.
-
-```sh
-python3 ship_controls.py --action SetSpeedZero --delay-seconds 3
-python3 ship_controls.py --delay-seconds 3 --sequence "SetSpeedZero; RollLeftButton total=0.45; SetSpeed100 delay=5"
-```
-
-Per-step fields inside `--sequence` are `repeat=<n> hold=<seconds> total=<seconds> delay=<seconds>`. `total=` is only valid for continuous controls (roll, yaw, pitch) and plans the number of repeated activations from the requested total actuation time. `delay=` pauses before the step so the game window can stay focused between effects.
-
-Plain bindings and modifier-combo bindings (`Ctrl+...` etc.) both work through the Quartz `CGEvent` backend. The earlier osascript-only quirks around `.` (`Key_Period`) and modifier combos are resolved.
-
-### `set_binding.py`
-
-Programmatically edits the `.binds` XML file, intended for agent-driven binding changes rather than navigating the in-game menu. Writes a `.bak` alongside the bindings file by default.
-
-```sh
-python3 set_binding.py PitchDownButton --show
-python3 set_binding.py PitchDownButton --key i
-python3 set_binding.py SetSpeedZero --key x --modifier ctrl
-python3 set_binding.py PitchDownButton --slot secondary --key q
-python3 set_binding.py PitchDownButton --clear
-```
-
-`--show` is read-only. `--key` accepts internal canonical names: letters (`a`-`z`), digits, punctuation literals (`. , [ ] / \ ; ' - =`), specials (`space`, `enter`, `tab`, `escape`, `backspace`, `delete`, `home`, `end`, `page_up`, `page_down`, arrows), modifier-as-key names (`left_shift`, `right_control`, ...), `numpad_<0-9>`, and `f<1-20>`. `--modifier` accepts the same modifier names plus the aliases `shift`, `ctrl`, `alt`. `--slot` is `primary` (default) or `secondary`. `--clear` empties the slot.
-
-Changes take effect when Elite Dangerous next reads the bindings file. The game generally re-reads on launch and when entering the Controls menu, so close and reopen ED after a write to be safe.
-
-### `run_routine.py`
-
-Runs the current journal-driven routines against a live Elite session. The supported routines are:
-
-- `auto_zero_throttle_on_arrival` — watches the journal for `SupercruiseExit` and dispatches `SetSpeedZero`
-- `jump` — dispatches `HyperSuperCombination`, waits for jump start, waits to return to `in_supercruise`, then zeroes throttle
-- `dock` — optionally waits for `SupercruiseExit`, sends the docking-request menu walk, waits for docking events, and can chain the in-station refuel menu
-- `station_refuel_menu` — waits for `Docked`, then sends the station refuel menu sequence
-
-```sh
-python3 run_routine.py --config config.toml --routine auto_zero_throttle_on_arrival
-python3 run_routine.py --config config.toml --routine auto_zero_throttle_on_arrival --delay-seconds 5
-python3 run_routine.py --config config.toml --routine jump --delay-seconds 5
-python3 run_routine.py --config config.toml --routine jump --delay-seconds 5 --log-events
-python3 run_routine.py --config config.toml --routine dock --delay-seconds 5 --log-events
-python3 run_routine.py --config config.toml --routine dock --skip-supercruise-exit --delay-seconds 5 --log-events
-python3 run_routine.py --config config.toml --routine dock --delay-seconds 5 --auto-refuel --log-events
-```
-
-The detailed manual test flow lives in [docs/manual-journal-routine-testing.md](docs/manual-journal-routine-testing.md).
-
-### `scratch_cv.py`
-
-CV pipeline probe. Captures one frame, runs the three template matchers (compass, navpoint, destination), and reports scores vs thresholds. Useful for verifying templates after a re-bake or diagnosing a failing match.
-
-```sh
-uv run python3 scratch_cv.py --config config.toml
-uv run python3 scratch_cv.py --config config.toml --save-debug /tmp/cv-debug.png --open
-uv run python3 scratch_cv.py --config config.toml --save-raw /tmp/cv-raw.png --delay 5
-```
-
-### `scratch_rebake.py`
-
-Extracts the processed image region used for a given template so you can re-bake it from a live CrossOver capture. `compass` outputs an equalized grayscale crop of the compass region. `destination` outputs an orange-filtered binary mask of the center region. Open the output in Preview, crop the target element, and save over the corresponding file in `templates/`.
-
-```sh
-uv run python3 scratch_rebake.py compass --delay 3 --open
-uv run python3 scratch_rebake.py destination --delay 3 --open
-uv run python3 scratch_rebake.py destination --raw /tmp/cv-raw.png --open
-```
-
-### `control_room.py`
-
-Live three-panel TUI for monitoring ship state and dispatching routines while the game is running. Built on [Textual](https://textual.textualize.io/).
-
-```sh
-uv run python3 control_room.py --config config.toml
-uv run python3 control_room.py --config config.toml --market aluminium
-```
-
-**Layout**
-
-- **SHIP STATUS** (top-left) — commander, system, station, flight status, fuel bar, credits, cargo fill, FSD target. Bootstrapped from the existing journal on startup, then updated live from new events.
-- **ACTIVITY** (bottom-left) — timestamped one-liners for recent events: jumps, docks, undocks, trades, refuels, mission rewards. Historical events on startup are suppressed; only events from the last ~2 minutes are shown.
-- **MARKET** (right) — commodity table loaded from `Market.json`. Reloads automatically when the file changes on disk (i.e. when you open the market screen in-game). Shows BUY and SELL sections filtered by the active filter term.
-
-**Routine commands** (type in the input bar at the bottom)
-
-| Command | What it does |
-|---|---|
-| `dock` | Dock routine + auto-refuel. If the ship is already in normal space, skips waiting for supercruise exit; otherwise waits for it first. |
-| `undock` | Launch from station. |
-| `jump` | FSD jump sequence. |
-| `buy <item> [N\|max]` | Buy N units of a commodity (default MAX). |
-| `sell` | Sell all non-stolen, non-mission cargo. Iterates the cargo manifest and calls `market_sell` on each commodity; skips items the market doesn't buy rather than aborting. |
-| `sell <item> [N\|max]` | Sell a specific commodity. |
-
-Only one routine can run at a time. A second command while a routine is active is rejected. Routine progress lines (waiting-for-event, key presses, pauses) appear in the activity log in dim text.
-
-If you press `Ctrl-C` or `Ctrl-D` while a routine is active, control room now cancels the active routine worker and stays open. The same keys exit control room only when it is idle.
-
-**Market commands**
-
-| Command | What it does |
-|---|---|
-| `market <term>` | Filter market panel to items matching the term in name or category. |
-| `market lock` | Freeze the market panel to the current station — docking elsewhere won't update it. |
-| `market unlock` | Release the lock. |
-| `market` | Clear the filter. |
-
-**Other**
-
-| Command | What it does |
-|---|---|
-| `commands` | Print the full supported command list to the activity log. |
-| `help [command]` | Explain one command in plain English, including what it tries to do. |
-| `q` / `quit` / `exit` | Cancel active work if needed, then exit control room cleanly. |
-
-Cargo state in the status pane still comes from `Cargo` journal events (written by the game on load and after each trade). For control-room `sell` with no item, if the live journal-backed cargo manifest is empty, control room now falls back to `Cargo.json` before reporting an empty hold.
-
-### `scratch_market.py`
-
-Reads `Market.json` from the journal directory and prints a formatted commodity listing matching the in-game market layout.
-
-```sh
-uv run python3 scratch_market.py --config config.toml
-uv run python3 scratch_market.py --config config.toml --raw
-```
-
-## Existing Runtime Assumptions
-
-The legacy computer vision code was built around:
-
-- 1080p-style capture assumptions
-- default orange Elite UI colors
-- a visible game window
-
-Those assumptions may need adjustment on macOS because of Retina scaling and CrossOver window behavior, but the vision logic itself is not the first thing to rewrite.
+- [docs/getting-started/quickstart.md](docs/getting-started/quickstart.md)
+- [docs/operators/control-room.md](docs/operators/control-room.md)
+- [docs/operators/manual-journal-routine-testing.md](docs/operators/manual-journal-routine-testing.md)
+- [docs/diagnostics/cli-reference.md](docs/diagnostics/cli-reference.md)
+- [docs/diagnostics/bindings-reference.md](docs/diagnostics/bindings-reference.md)
+- [docs/README.md](docs/README.md)
 
 ## Development
 
-This project is still experimental. Do not leave it running unattended.
-
-Run the lightweight verification harness with:
+Use the repo `uv` environment for tests:
 
 ```sh
-uv run python3 -m unittest discover -s tests -p 'test_*.py'
+uv run python3 -m unittest discover -s tests
 ```
 
 For commits, use Conventional Commits.

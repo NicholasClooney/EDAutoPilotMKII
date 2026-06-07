@@ -17,11 +17,11 @@ This plan is intentionally scoped to answering those questions, not to porting t
 
 ## Scope
 
-Add a single standalone harness, `scratch_cv.py`, in the repo root, modelled on `scratch_cgevent.py`:
+Add a single standalone harness, `tools/scratch/scratch_cv.py`, modelled on `tools/scratch/scratch_cgevent.py`:
 
 - Loads the shared runtime context the same way other manual scripts do (`edap.runtime.build_runtime_context`, honouring `--config`).
 - Captures the configured base region once via the existing capture seam (`edap/capture.py`, `edap/platform/screen/macos.py`).
-- Ports the three matching functions from legacy `dev_autopilot.py` as small pure functions in the script (not yet in `edap/vision.py`). Reference: `dev_autopilot.py:768-900` for `get_compass_image`, `get_navpoint_offset`, `get_destination_offset`.
+- Ports the three matching functions from legacy `archive/legacy-windows/dev_autopilot.py` as small pure functions in the script (not yet in `edap/vision.py`). Reference: `archive/legacy-windows/dev_autopilot.py:768-900` for `get_compass_image`, `get_navpoint_offset`, `get_destination_offset`.
 - Runs `cv2.matchTemplate` against each template, reports the best match score, location, and the legacy threshold for comparison.
 - Optionally writes an annotated debug PNG (input frame plus bounding boxes and offset markers).
 - CLI surface, kept small:
@@ -34,28 +34,28 @@ Out of scope:
 - Continuous capture loop (covered by plan 0004's capture benchmark).
 - Roll / pitch / yaw actuation based on offsets.
 - Sun-brightness guard. Mention it in passing if convenient, but do not block on it.
-- Promoting the matchers into `edap/vision.py`. Once the templates are validated, a follow-up can lift them out of `scratch_cv.py`.
+- Promoting the matchers into `edap/vision.py`. Once the templates are validated, a follow-up can lift them out of `tools/scratch/scratch_cv.py`.
 
 ## Reference Pointers
 
 - Legacy implementation:
-  - `dev_autopilot.py:746-754` — `sun_percent`
-  - `dev_autopilot.py:768-808` — `get_compass_image`
-  - `dev_autopilot.py:810-867` — `get_navpoint_offset` (with smoothing history)
-  - `dev_autopilot.py:869-913` — `get_destination_offset`
+  - `archive/legacy-windows/dev_autopilot.py:746-754` — `sun_percent`
+  - `archive/legacy-windows/dev_autopilot.py:768-808` — `get_compass_image`
+  - `archive/legacy-windows/dev_autopilot.py:810-867` — `get_navpoint_offset` (with smoothing history)
+  - `archive/legacy-windows/dev_autopilot.py:869-913` — `get_destination_offset`
 - Template assets: `templates/compass.png`, `templates/navpoint.png`, `templates/destination.png`.
 - Capture seam: `edap/capture.py`, `edap/platform/screen/macos.py`. The capture already returns a NumPy-friendly image.
 - Research note framing the question: `docs/research/0004-legacy-autopilot-port-status.md` (CV templates section).
 
 ## Acceptance Criteria
 
-- Running `python3 scratch_cv.py --config config.toml --save-debug /tmp/cv-debug.png` against a live CrossOver Elite session prints a single block with:
+- Running `uv run python3 tools/scratch/scratch_cv.py --config config.toml --save-debug /tmp/cv-debug.png` against a live CrossOver Elite session prints a single block with:
   - the input capture size and the region used
   - per-template best match score, location, and pass/fail against the legacy threshold
   - the computed navpoint offset and destination offset, in pixels relative to the compass / centre
 - The annotated debug image lands on disk with visible bounding boxes and offset markers, so failures are eyeballable.
 - The script exits 0 if all three templates pass their thresholds, non-zero otherwise. This makes it trivially scriptable from later benchmarks.
-- The script does not import anything Windows-only and does not depend on the legacy `dev_autopilot.py` runtime.
+- The script does not import anything Windows-only and does not depend on the legacy `archive/legacy-windows/dev_autopilot.py` runtime.
 
 ## Open Questions To Resolve While Building
 

@@ -6,10 +6,10 @@ can crop the element in Preview and save it back to templates/.
 
 Usage:
     # Compass: equalized grayscale — crop the compass dial face
-    uv run python3 scratch_rebake.py compass
+    uv run python3 tools/scratch/scratch_rebake.py compass
 
     # Destination: orange-filtered center — crop the 3/4 circle reticle
-    uv run python3 scratch_rebake.py destination
+    uv run python3 tools/scratch/scratch_rebake.py destination
 
 Both subcommands can capture a live frame (with optional --delay) or reuse
 an existing raw PNG via --raw.  The processed region is written to --out
@@ -27,6 +27,10 @@ from pathlib import Path
 
 import cv2
 import numpy as np
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 
 def _capture_raw(config_path: str, delay: float) -> np.ndarray:

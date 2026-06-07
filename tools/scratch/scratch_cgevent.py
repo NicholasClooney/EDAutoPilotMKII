@@ -7,18 +7,18 @@ fixes the cases the current osascript backend can't:
 - modifier-combo ship controls like Ctrl+...
 
 Install once:
-    python3 -m pip install pyobjc-framework-Quartz
+    uv sync
 
 Usage:
-    python3 scratch_cgevent.py <key> [--hold 0.4] [--modifier ctrl] \\
+    uv run python3 tools/scratch/scratch_cgevent.py <key> [--hold 0.4] [--modifier ctrl] \\
         [--unicode|--no-unicode] [--delay 3.0]
-    python3 scratch_cgevent.py --sequence "x; a hold=0.4 delay=1; . hold=0.4 delay=1"
+    uv run python3 tools/scratch/scratch_cgevent.py --sequence "x; a hold=0.4 delay=1; . hold=0.4 delay=1"
 
 Examples:
-    python3 scratch_cgevent.py a --hold 0.5
-    python3 scratch_cgevent.py . --hold 0.5
-    python3 scratch_cgevent.py . --hold 0.5 --no-unicode
-    python3 scratch_cgevent.py x --modifier ctrl --hold 0.2
+    uv run python3 tools/scratch/scratch_cgevent.py a --hold 0.5
+    uv run python3 tools/scratch/scratch_cgevent.py . --hold 0.5
+    uv run python3 tools/scratch/scratch_cgevent.py . --hold 0.5 --no-unicode
+    uv run python3 tools/scratch/scratch_cgevent.py x --modifier ctrl --hold 0.2
 
 Sequence per-step fields: hold=<seconds> delay=<seconds> modifier=<name>
 

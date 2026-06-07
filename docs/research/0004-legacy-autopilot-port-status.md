@@ -10,56 +10,56 @@ The intent is to give future work a clear "what exists, what is stub, what is no
 
 ## Original Autopilot, In One Page
 
-The legacy autopilot lives almost entirely in `dev_autopilot.py` and runs a journal-event-driven state machine wrapped around an OpenCV alignment loop.
+The legacy autopilot lives almost entirely in `archive/legacy-windows/dev_autopilot.py` and runs a journal-event-driven state machine wrapped around an OpenCV alignment loop.
 
 ### Loop shape
 
-`dev_autopilot.py:1284-1305` is the main loop. While the ship has a target:
+`archive/legacy-windows/dev_autopilot.py:1284-1305` is the main loop. While the ship has a target:
 
-1. read the journal via `ship()` (`dev_autopilot.py:151-248`) and update derived state
+1. read the journal via `ship()` (`archive/legacy-windows/dev_autopilot.py:151-248`) and update derived state
 2. inspect status flags (`in_space`, `in_supercruise`, `starting_hyperspace`, `starting_docking`, ...)
 3. dispatch the next mode in order: `align` -> `jump` -> `refuel` -> `position`
-4. actuate by resolving Elite XML bindings to scancodes and pressing keys via `src/directinput.py`
+4. actuate by resolving Elite XML bindings to scancodes and pressing keys via `archive/legacy-windows/src/directinput.py`
 
 State transitions are driven by journal events: `StartJump` + `JumpType` -> `starting_hyperspace` or `starting_supercruise`; `FSDJump`, `SupercruiseEntry` -> `in_supercruise`; `SupercruiseExit`, `Undocked`, `DockingCancelled`, `Location.Docked=false` -> `in_space`; `DockingRequested` -> `starting_docking`; `Music.MusicTrack=="DockingComputer"` plus status transitions -> `in_docking` or `in_undocking`; `Docked` -> `in_station`.
 
 ### Modes
 
-- **Align** (`dev_autopilot.py:1020-1114`). Navigate toward the current target.
+- **Align** (`archive/legacy-windows/dev_autopilot.py:1020-1114`). Navigate toward the current target.
   - Sensors: HSV sun-brightness mask `[0,100,240]-[180,255,255]`; CLAHE-equalized capture; template matches against `templates/compass.png`, `templates/navpoint.png`, `templates/destination.png`.
   - Pipeline: capture the middle third of the screen, find the compass, isolate the blue navpoint dot inside it (coarse heading), then switch to full center region and match the orange destination marker (fine alignment).
   - Actuates roll / pitch / yaw button presses with hold times scaled by offset magnitude. Exits on alignment threshold or jump initiation.
-- **Jump** (`dev_autopilot.py:1128-1154`). Trigger FSD.
+- **Jump** (`archive/legacy-windows/dev_autopilot.py:1128-1154`). Trigger FSD.
   - Sensors: journal status polling, waits for `starting_hyperspace` then `in_supercruise`.
   - Actuates `HyperSuperCombination` (hold 1s); rechecks status after 16s; up to 3 retries with a re-align in between.
-- **Refuel** (`dev_autopilot.py:1169-1196`). Scoop fuel from scoopable stars.
+- **Refuel** (`archive/legacy-windows/dev_autopilot.py:1169-1196`). Scoop fuel from scoopable stars.
   - Sensors: journal-derived star class and fuel percent.
   - Condition: fuel < 33% AND star class in `{F, O, G, K, B, A, M}`.
   - Actuates `SetSpeed100` -> `SetSpeedZero` x3, then polls journal until `FuelLevel == FuelCapacity`.
   - Legacy sequence detail: the old routine assumes the ship is already in supercruise at a scoopable star, sends `SetSpeed100`, waits 4 seconds, sends `SetSpeedZero` three times, then waits until fuel reaches 100%.
   - Legacy safety note: there is no heat guard, no distance/proximity guard, no "did scooping actually start?" check, and no timeout in the original implementation.
-- **Position / Scan** (`dev_autopilot.py:1227-1253`). Reposition and trigger discovery scanner between jumps.
+- **Position / Scan** (`archive/legacy-windows/dev_autopilot.py:1227-1253`). Reposition and trigger discovery scanner between jumps.
   - Sensors: scanner state (held in tray UI state), sun brightness.
   - Actuates `PrimaryFire` or `SecondaryFire` hold, pitch up, set speed 100, more pitch up, then waits until sun < 3% (or 5-20s depending on whether a refuel happened).
-- **Dock** (`dev_autopilot.py:955-992`). Request and confirm a station dock.
+- **Dock** (`archive/legacy-windows/dev_autopilot.py:955-992`). Request and confirm a station dock.
   - Sensors: journal status polling -> `starting_docking` -> `in_docking` -> `in_station`.
   - Actuates `UIFocus`, `UI_*` navigation, `UI_Select` to drive the menu; sets speed zero; retries menu on failure.
-- **Undock** (`dev_autopilot.py:916-940`). Leave the station and reach `in_space`.
+- **Undock** (`archive/legacy-windows/dev_autopilot.py:916-940`). Leave the station and reach `in_space`.
   - Sensors: journal status -> `in_undocking` -> `in_space`.
   - Actuates a flurry of `UI_Back`, then down, select; waits on the docking-computer music cue; sets speed zero; polls until status leaves the station.
 
 ### Sensors in detail
 
-- **Journal parsing** (`dev_autopilot.py:151-248`): reads the latest `Journal.*` file line by line as JSON, extracts `FuelLevel`, `FuelCapacity`, interprets a `FuelScoop` event timestamp to detect active scooping.
-- **Compass offsets** (`dev_autopilot.py:810-856, 869-900`):
+- **Journal parsing** (`archive/legacy-windows/dev_autopilot.py:151-248`): reads the latest `Journal.*` file line by line as JSON, extracts `FuelLevel`, `FuelCapacity`, interprets a `FuelScoop` event timestamp to detect active scooping.
+- **Compass offsets** (`archive/legacy-windows/dev_autopilot.py:810-856, 869-900`):
   - `get_compass_image()` finds the compass template in the middle-bottom of the screen and returns a cropped image plus its dimensions.
   - `get_navpoint_offset()` matches the blue navpoint dot inside the compass and computes `(x, y)` relative to the compass center; uses history smoothing to reject flicker.
   - `get_destination_offset()` matches the orange destination marker in the screen center third.
-- **Sun guard** (`dev_autopilot.py:746-754`): counts bright pixels (`HSV V > 215`) in the center third as a percentage of the frame. Alignment blocks until the sun share drops below 5%.
+- **Sun guard** (`archive/legacy-windows/dev_autopilot.py:746-754`): counts bright pixels (`HSV V > 215`) in the center third as a percentage of the frame. Alignment blocks until the sun share drops below 5%.
 
 ### Actuation
 
-`dev_autopilot.py:387-420` parses Elite XML bindings, converts them to DirectInput scancodes, and calls `PressKey()` / `ReleaseKey()` from `src/directinput.py`. Default modifier delay 10ms, default key hold 200ms, default repeat interval 100ms.
+`archive/legacy-windows/dev_autopilot.py:387-420` parses Elite XML bindings, converts them to DirectInput scancodes, and calls `PressKey()` / `ReleaseKey()` from `archive/legacy-windows/src/directinput.py`. Default modifier delay 10ms, default key hold 200ms, default repeat interval 100ms.
 
 ## Port Status, Capability by Capability
 
@@ -86,7 +86,7 @@ These are places where the new platform abstractions should cover the legacy beh
 - **CV templates on Retina + CrossOver.** Templates `compass.png`, `navpoint.png`, `destination.png` were authored against 1080p Windows captures. Nothing has run `cv2.matchTemplate` against a real CrossOver Elite window on this machine. To falsify: port `get_compass_image()`, run on a live capture, verify a match score above the legacy threshold. If templates do not match, they will need to be re-baked at the macOS capture resolution.
 - **Real-time capture loop.** Diagnostics has only ever captured a single frame. The legacy align loop captures continuously. Frame rate, capture cost, and window-tracking behavior on Retina / CrossOver are unmeasured. Planned as a dedicated benchmark — see Future Test Items below.
 - **Journal write latency vs poll rate.** Legacy reads the file fresh each iteration. The new `edap/state.py` does the same on demand. We have not measured how quickly Elite (through CrossOver) flushes journal events to disk relative to a 0.5-1s poll, so we do not know whether tight state machines will miss transitions. Planned — see Future Test Items below.
-- **Sustained held flight controls under modifier combos.** Treated as proven by the multi-action burst sequences run through `ship_controls.py` and `scratch_cgevent.py` against the live cockpit, including Ctrl+X SetSpeedZero and chained roll/yaw/pitch sweeps. Not a multi-second single hold, but the held-key path is exercised closely enough that further proof is unnecessary until a real align loop runs into a regression.
+- **Sustained held flight controls under modifier combos.** Treated as proven by the multi-action burst sequences run through `ship_controls.py` and `tools/scratch/scratch_cgevent.py` against the live cockpit, including Ctrl+X SetSpeedZero and chained roll/yaw/pitch sweeps. Not a multi-second single hold, but the held-key path is exercised closely enough that further proof is unnecessary until a real align loop runs into a regression.
 - **Hotkeys on macOS.** Parked 2026-05-27. The legacy `keyboard` library does not work on macOS without entitlements we are not going to grant to a generic pip dep, and a `Quartz.CGEventTapCreate` listener is genuine new work that we do not need before the first journal-driven routines land. Likely future direction is a small menu-bar app (e.g. `rumps`-based) that triggers routines without owning a global hotkey listener. Until then, routines launch explicitly from the CLI.
 - **Window focus and input routing during autopilot.** `CGEventPost(kCGHIDEventTap, ...)` is global on macOS; behavior across focus loss, hidden CrossOver windows, and multi-monitor setups during a live autopilot run is untested.
 - **Compass / navpoint offset math under Retina scaling.** The math is resolution-independent in principle, but it has not been re-validated against macOS captures where logical and physical pixels differ.

@@ -8,10 +8,10 @@ In Progress
 
 The current project is designed around a Windows runtime:
 
-- Keyboard input uses `ctypes.windll.user32.SendInput` in `src/directinput.py`.
+- Keyboard input uses `ctypes.windll.user32.SendInput` in `archive/legacy-windows/src/directinput.py`.
 - Journal and bindings discovery assume Windows paths under `%USERPROFILE%` and `%LOCALAPPDATA%`.
 - Startup and control flow assume a tray app with hardcoded `Home` and `End` hotkeys.
-- The autopilot logic, platform I/O, screen capture, and user configuration are all mixed together in `dev_autopilot.py`.
+- The autopilot logic, platform I/O, screen capture, and user configuration are all mixed together in `archive/legacy-windows/dev_autopilot.py`.
 
 The immediate goal is not a full rewrite. The goal is a macOS-first MVP that runs Elite Dangerous through CrossOver, while preserving a structure that can support Windows again later.
 
@@ -80,7 +80,7 @@ Split the current monolith into platform-neutral logic plus platform-specific ad
 - `edap/platform/input/macos.py`
   - macOS synthetic key events
 - `edap/platform/input/windows.py`
-  - Existing direct input logic migrated from `src/directinput.py`
+  - Existing direct input logic migrated from `archive/legacy-windows/src/directinput.py`
 - `edap/platform/paths/base.py`
   - Path resolution interface
 - `edap/platform/paths/macos.py`
@@ -265,7 +265,7 @@ Mitigation:
 
 ### 4. Global state in current code complicates incremental migration
 
-`dev_autopilot.py` mixes logging setup, config constants, globals, parsing, vision, and control flow.
+`archive/legacy-windows/dev_autopilot.py` mixes logging setup, config constants, globals, parsing, vision, and control flow.
 
 Mitigation:
 
@@ -278,7 +278,7 @@ Mitigation:
 1. Add `docs/` plan and agree on MVP scope
 2. Add config file loading and validation
 3. Add a normalized internal key model
-4. Extract journal and bindings parsing from `dev_autopilot.py`
+4. Extract journal and bindings parsing from `archive/legacy-windows/dev_autopilot.py`
 5. Introduce platform interfaces for input, paths, and screen capture
 6. Implement macOS diagnostic runner
 7. Prove macOS input into CrossOver

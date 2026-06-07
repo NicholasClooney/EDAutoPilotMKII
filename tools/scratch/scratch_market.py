@@ -11,16 +11,21 @@ with items sorted alphabetically within each category.
 Open the market screen in-game first, then run this.
 
 Usage:
-    uv run python3 scratch_market.py --config config.toml
-    uv run python3 scratch_market.py --config config.toml --filter gold
-    uv run python3 scratch_market.py --config config.toml --raw
-    uv run python3 scratch_market.py --config config.toml --raw --sort sell
+    uv run python3 tools/scratch/scratch_market.py --config config.toml
+    uv run python3 tools/scratch/scratch_market.py --config config.toml --filter gold
+    uv run python3 tools/scratch/scratch_market.py --config config.toml --raw
+    uv run python3 tools/scratch/scratch_market.py --config config.toml --raw --sort sell
 """
 from __future__ import annotations
 
 import argparse
 import json
 import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 from edap.runtime import build_runtime_context, load_config_with_fallback
 

@@ -27,16 +27,16 @@ A small class that tails the latest journal file and yields parsed events. State
 - Polling cadence: a single `poll_interval_s` knob, default `0.5s`. The watcher should not spin; it should sleep between polls.
 - Testability: accept an injected clock / sleeper so tests can drive it deterministically. Mirror the pattern already in `edap/platform/input/macos.py` and `edap/routines.py`.
 
-Reference: legacy `dev_autopilot.py:151-248` (`ship()`) reads the whole file each time. The new watcher should be incremental.
+Reference: legacy `archive/legacy-windows/dev_autopilot.py:151-248` (`ship()`) reads the whole file each time. The new watcher should be incremental.
 
 ### 2. Routine extensions in `edap/routines.py`
 
 Add one routine at a time, each modelled on its legacy counterpart but driven by the new `JournalWatcher` and `ShipControls`. Order of work:
 
 1. `auto_zero_throttle_on_arrival(controls, watcher)` — listens for `SupercruiseExit`, dispatches `SetSpeedZero`. This is the smallest, lowest-risk routine and proves the watcher → controls path end-to-end.
-2. `jump(controls, watcher)` — mirror `dev_autopilot.py:1128-1154`. Dispatch `HyperSuperCombination` with a held tap, wait for `starting_hyperspace` → `in_supercruise`, retry up to 3 times. No align fallback yet (that needs CV).
-3. `refuel(controls, watcher, threshold_percent=33)` — mirror `dev_autopilot.py:1169-1196`. Trigger when fuel% < threshold AND star class in `{F, O, G, K, B, A, M}`. Dispatch the `SetSpeed100` → `SetSpeedZero` x3 sequence, then poll the watcher until `FuelLevel == FuelCapacity` or a timeout fires.
-4. `dock(controls, watcher)` — mirror `dev_autopilot.py:955-992`. Drive the UI menu walk: `UIFocus`, `UI_Left`, `UI_Up`, `UI_Select`, etc. Wait on the journal transition `starting_docking` → `in_docking` → `in_station`. Retry the menu walk on timeout.
+2. `jump(controls, watcher)` — mirror `archive/legacy-windows/dev_autopilot.py:1128-1154`. Dispatch `HyperSuperCombination` with a held tap, wait for `starting_hyperspace` → `in_supercruise`, retry up to 3 times. No align fallback yet (that needs CV).
+3. `refuel(controls, watcher, threshold_percent=33)` — mirror `archive/legacy-windows/dev_autopilot.py:1169-1196`. Trigger when fuel% < threshold AND star class in `{F, O, G, K, B, A, M}`. Dispatch the `SetSpeed100` → `SetSpeedZero` x3 sequence, then poll the watcher until `FuelLevel == FuelCapacity` or a timeout fires.
+4. `dock(controls, watcher)` — mirror `archive/legacy-windows/dev_autopilot.py:955-992`. Drive the UI menu walk: `UIFocus`, `UI_Left`, `UI_Up`, `UI_Select`, etc. Wait on the journal transition `starting_docking` → `in_docking` → `in_station`. Retry the menu walk on timeout.
 5. `undock(controls, watcher)` — drive the undock menu walk. Wait on `in_undocking` → `in_space`. See discrepancy note below.
 
 All routines should follow the existing `RoutineResult` shape (or extend it) so that a CLI can report what was done.
@@ -59,11 +59,11 @@ Out of scope:
 ## Reference Pointers
 
 - Legacy:
-  - `dev_autopilot.py:151-248` — `ship()`, the event vocabulary the watcher should match.
-  - `dev_autopilot.py:916-940` — `undock`. **Discrepancy:** the legacy code sends `SetSpeedZero x2` between the launch confirm and the `in_space` wait (lines 929-930). The ship is still in the docking bay at that point so zeroing throttle has no meaningful effect. The new implementation omits this step. If testing reveals the game requires the throttle to be low before undocking completes, revisit.
-  - `dev_autopilot.py:955-992` — `dock`.
-  - `dev_autopilot.py:1128-1154` — `jump`.
-  - `dev_autopilot.py:1169-1196` — `refuel`.
+  - `archive/legacy-windows/dev_autopilot.py:151-248` — `ship()`, the event vocabulary the watcher should match.
+  - `archive/legacy-windows/dev_autopilot.py:916-940` — `undock`. **Discrepancy:** the legacy code sends `SetSpeedZero x2` between the launch confirm and the `in_space` wait (lines 929-930). The ship is still in the docking bay at that point so zeroing throttle has no meaningful effect. The new implementation omits this step. If testing reveals the game requires the throttle to be low before undocking completes, revisit.
+  - `archive/legacy-windows/dev_autopilot.py:955-992` — `dock`.
+  - `archive/legacy-windows/dev_autopilot.py:1128-1154` — `jump`.
+  - `archive/legacy-windows/dev_autopilot.py:1169-1196` — `refuel`.
 - New runtime:
   - `edap/state.py:33-110` — current `read_ship_state` reads the whole file; the watcher is the incremental cousin.
   - `edap/routines.py` — existing `set_speed_zero_then_wait` is the shape to follow.
@@ -88,5 +88,5 @@ Out of scope:
 ## Notes For The Next Agent
 
 - Build the watcher first and prove it with a tiny script that just prints events. Skip ahead to routines only once you can see events landing in real time during a live session.
-- Resist the urge to add an orchestration layer ("autopilot()") that chains routines together. The legacy `autopilot()` is `dev_autopilot.py:1284-1305`; we will get there, but not in this plan.
+- Resist the urge to add an orchestration layer ("autopilot()") that chains routines together. The legacy `autopilot()` is `archive/legacy-windows/dev_autopilot.py:1284-1305`; we will get there, but not in this plan.
 - If a routine needs an action that isn't bound, fail loudly via `ActionDispatchResult`'s `status` / `reason` — do not silently no-op.
