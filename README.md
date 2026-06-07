@@ -4,6 +4,8 @@ macOS-first Elite Dangerous automation tooling for CrossOver, with future Window
 
 The current operator surface is [`control_room.py`](control_room.py). The project is not a full autopilot yet; it is a live runtime and routine stack built around journal parsing, bindings lookup, synthetic input, and early workflow automation.
 
+![ED Control Room](docs/assets/control-room.png)
+
 See [docs/STATUS.md](docs/STATUS.md) for the maintained status, validation notes, and next recommended work.
 
 ## Current Surface
@@ -17,7 +19,6 @@ What works today:
 What is not done:
 
 - the legacy CV-driven align loop is still not ported into the active runtime
-- the repo still needs a real tracked Control Room screenshot; the asset slot is reserved under `docs/assets/`
 
 ## Primary Entrypoints
 
