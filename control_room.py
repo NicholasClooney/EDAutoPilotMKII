@@ -37,7 +37,7 @@ import argparse
 import json
 import sys
 import time
-from datetime import UTC, datetime
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
 
@@ -51,6 +51,14 @@ from textual.worker import get_current_worker
 
 from edap.config import AppConfig
 from edap.control_room.help import CONTROL_ROOM_COMMAND_INDEX, CONTROL_ROOM_COMMANDS
+from edap.control_room.history import (
+    default_haul_matches as _default_haul_matches_pure,
+    filtered_resume_entries as _filtered_resume_entries_pure,
+    now_iso as _now_iso,
+    resume_detail as _resume_detail,
+    resume_label as _resume_label_pure,
+    resume_summary as _resume_summary,
+)
 from edap.control_room.models import MarketData, ReplaySelection, ShipState
 from edap.control_room_state import (
     CommandHistoryEntry,
@@ -137,22 +145,6 @@ def _parse_amount(s: str) -> int | str | None:
         return n if n > 0 else None
     except ValueError:
         return None
-
-
-def _now_iso() -> str:
-    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-
-
-def _resume_summary(entry: CommandHistoryEntry) -> str:
-    prefix = entry.timestamp or "?"
-    return f"{prefix}  {entry.raw}"
-
-
-def _resume_detail(entry: CommandHistoryEntry) -> str:
-    if not entry.params:
-        return entry.raw
-    parts = [f"{key}={value}" for key, value in entry.params.items()]
-    return f"{entry.raw}\n" + "\n".join(parts)
 
 
 def _read_cargo_inventory(journal_dir: Path) -> list[dict[str, Any]]:
@@ -452,30 +444,17 @@ class ControlRoomApp(App[None]):
         self._save_saved_state()
 
     def _default_haul_matches(self, entry: CommandHistoryEntry) -> bool:
-        return entry.command == "haul" and bool(self._saved_state.default_haul) and entry.params == self._saved_state.default_haul
+        return _default_haul_matches_pure(entry, self._saved_state.default_haul)
 
     def _resume_label(self, entry: CommandHistoryEntry) -> str:
-        marker = "* " if self._default_haul_matches(entry) else "  "
-        return marker + _resume_summary(entry)
+        return _resume_label_pure(entry, self._saved_state.default_haul)
 
     def _filtered_resume_entries(self) -> list[ReplaySelection]:
-        prefix = self._resume_filter.lower()
-        history = [
-            entry for entry in reversed(self._saved_state.history)
-            if not prefix or entry.raw.lower().startswith(prefix)
-        ]
-        if self._saved_state.default_haul:
-            pinned = [e for e in history if self._default_haul_matches(e)]
-            rest = [e for e in history if not self._default_haul_matches(e)]
-            history = pinned[:1] + rest
-        return [
-            ReplaySelection(
-                entry=entry,
-                label=self._resume_label(entry),
-                detail=_resume_detail(entry),
-            )
-            for entry in history
-        ]
+        return _filtered_resume_entries_pure(
+            self._saved_state.history,
+            self._saved_state.default_haul,
+            self._resume_filter,
+        )
 
     def _refresh_resume_help(self) -> None:
         filter_label = self._resume_filter or "none"
