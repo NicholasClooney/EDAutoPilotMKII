@@ -213,12 +213,6 @@ def main() -> int:
         help="Maximum time to wait for Undocked event after sending the launch command (overrides config)",
     )
     parser.add_argument(
-        "--in-space-timeout-seconds",
-        type=float,
-        default=None,
-        help="Maximum time to wait after Undocked for in-space confirmation (overrides config)",
-    )
-    parser.add_argument(
         "--target",
         metavar="COMMODITY",
         help="Commodity name for market_buy/market_sell (case-insensitive, must match Name_Localised in Market.json)",
@@ -361,9 +355,6 @@ def main() -> int:
     if args.undock_timeout_seconds is not None and args.undock_timeout_seconds < 0:
         sys.stderr.write("Invalid routine request: --undock-timeout-seconds must be non-negative\n")
         return 2
-    if args.in_space_timeout_seconds is not None and args.in_space_timeout_seconds < 0:
-        sys.stderr.write("Invalid routine request: --in-space-timeout-seconds must be non-negative\n")
-        return 2
     if args.max_hold_seconds < 0:
         sys.stderr.write("Invalid routine request: --max-hold-seconds must be non-negative\n")
         return 2
@@ -452,11 +443,6 @@ def main() -> int:
         args.undock_timeout_seconds
         if args.undock_timeout_seconds is not None
         else loaded.config.controls.undock_timeout_seconds
-    )
-    in_space_timeout_seconds = (
-        args.in_space_timeout_seconds
-        if args.in_space_timeout_seconds is not None
-        else loaded.config.controls.undock_in_space_timeout_seconds
     )
     journal_dir = runtime.journal.effective_path
     journal_source = runtime.journal.cli_source_status()
@@ -634,7 +620,6 @@ def main() -> int:
                 logging_controls,
                 watcher,
                 undock_timeout_s=undock_timeout_seconds,
-                in_space_timeout_s=in_space_timeout_seconds,
                 step_delay_s=step_delay_seconds,
                 sleeper=logging_sleeper,
                 progress_fn=_progress,
@@ -681,7 +666,6 @@ def main() -> int:
                 dock_timeout_s=dock_timeout_seconds,
                 request_timeout_s=args.request_timeout_seconds,
                 undock_timeout_s=undock_timeout_seconds,
-                undock_in_space_timeout_s=in_space_timeout_seconds,
                 trade_timeout_s=args.trade_timeout_seconds,
                 settle_s=args.settle_seconds,
                 galaxy_map_settle_s=(
@@ -742,7 +726,6 @@ def main() -> int:
             "dock_timeout_s": dock_timeout_seconds,
             "request_timeout_s": args.request_timeout_seconds,
             "undock_timeout_s": undock_timeout_seconds,
-            "in_space_timeout_s": in_space_timeout_seconds,
             "skip_supercruise_exit": args.skip_supercruise_exit,
             "auto_refuel": args.auto_refuel,
             "event_log_path": args.event_log_path if args.log_events and routine_needs_journal else None,

@@ -41,7 +41,6 @@ class LoadConfigTests(unittest.TestCase):
             self.assertEqual(config.controls.galaxy_map_settle_seconds, 2.0)
             self.assertEqual(config.controls.haul_dock_timeout_seconds, 600.0)
             self.assertEqual(config.controls.undock_timeout_seconds, 30.0)
-            self.assertEqual(config.controls.undock_in_space_timeout_seconds, 180.0)
             self.assertEqual(config.screen.resolution_width, 1920)
             self.assertEqual(config.screen.capture.mode, "fullscreen")
             self.assertIn("center", config.screen.capture.regions)

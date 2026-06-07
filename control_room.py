@@ -730,7 +730,6 @@ class ControlRoomApp(App[None]):
         sleeper = self._make_sleeper()
         step_delay = self._config.controls.step_delay_seconds
         undock_timeout = self._config.controls.undock_timeout_seconds
-        in_space_timeout = self._config.controls.undock_in_space_timeout_seconds
         watcher = self._make_watcher()
 
         self._routine_active = True
@@ -739,7 +738,6 @@ class ControlRoomApp(App[None]):
             controls,
             watcher,
             undock_timeout_s=undock_timeout,
-            in_space_timeout_s=in_space_timeout,
             step_delay_s=step_delay,
             sleeper=sleeper,
             progress_fn=progress,

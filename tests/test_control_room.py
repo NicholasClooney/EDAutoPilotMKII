@@ -34,7 +34,6 @@ def _make_config(journal_dir: Path) -> AppConfig:
             galaxy_map_settle_seconds=2.0,
             haul_dock_timeout_seconds=600.0,
             undock_timeout_seconds=30.0,
-            undock_in_space_timeout_seconds=180.0,
         ),
         screen=ScreenConfig(
             resolution_width=1920,
@@ -164,7 +163,6 @@ class ControlRoomCommandTests(unittest.TestCase):
             self.app._cmd_undock()
 
         self.assertEqual(captured["kwargs"]["undock_timeout_s"], 30.0)
-        self.assertEqual(captured["kwargs"]["in_space_timeout_s"], 180.0)
         self.assertEqual(captured["kwargs"]["step_delay_s"], 0.3)
 
     def test_sell_all_falls_back_to_cargo_json_when_live_manifest_is_empty(self) -> None:

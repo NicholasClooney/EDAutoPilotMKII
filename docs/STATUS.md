@@ -2,7 +2,7 @@
 
 _This is the maintained status document for the repo. Update it at the end of each session when project understanding, port status, or next steps change. Keep it current over time rather than treating it as a frozen checkpoint._
 
-Last updated: 2026-06-07 (session 23)
+Last updated: 2026-06-07 (session 24)
 
 ## Where We Are
 
@@ -24,7 +24,7 @@ The first journal-driven runtime pieces now exist:
 - `undock` now exists as a journal-driven routine. It sends `UI_Back x10`, `HeadLookReset`, a single `UI_Down` tap, and `UI_Select` to trigger launch, then polls for the `Undocked` journal event (configurable timeout, default 30s). The legacy `SetSpeedZero` calls between launch confirm and undock completion were dropped — the ship is still in the docking bay at that point and throttle state is irrelevant. Discrepancy noted in `docs/plans/0003-journal-driven-routines.md`.
 - `edap/routines/` (1 400-line flat file) was split into `edap/routines/` package: `_base.py` (protocols, `RoutineResult`, event helpers), `throttle.py`, `jump.py`, `docking.py`, `market.py`, `galaxy_map.py`, `haul.py`. `__init__.py` re-exports the full public surface unchanged.
 - `run_routine.py` now supports `auto_zero_throttle_on_arrival`, `jump`, `dock`, `station_refuel_menu`, and `undock` as live manual harnesses for exercising journal-driven paths against a real Elite session.
-- Undock timing defaults now live in config: `controls.undock_timeout_seconds` (default 30s) and `controls.undock_in_space_timeout_seconds` (default 180s). `run_routine.py` flags override config; `control_room.py` and `haul_loop` now use the same defaults.
+- Undock timeout lives in config: `controls.undock_timeout_seconds` (default 30s). `run_routine.py` flag `--undock-timeout-seconds` overrides config; `control_room.py` and `haul_loop` use the same default. The in-space confirmation step (and `undock_in_space_timeout_seconds`) was reverted — `undock` now returns as soon as the `Undocked` journal event is seen.
 - `run_routine.py` now emits live progress to stderr (waiting-for-event, event-detected, key-presses, pauses). JSON output is opt-in via `--json`.
 - The current live manual test flows for those harnesses are documented in `docs/manual-journal-routine-testing.md`.
 
@@ -62,7 +62,7 @@ The important caveat is that the real autopilot loop is still largely unported. 
 | Jump sequencing | Done | `edap/routines/` — retrying journal-driven routine with start/completion timeouts and throttle-zero follow-up |
 | Refuel sequencing | Deferred | Legacy behavior is understood, but implementation is intentionally paused for now |
 | Dock sequencing | Done | `edap/routines/` — waits on journal events, boosts after SCX and settles, drives legacy-style docking request UI walk (three `ui_left` presses after panel navigation to reset contacts cursor, then `ui_right` + `ui_select`; `ui_left` to exit contacts menu after), retries after DockingDenied with configurable delay, optionally chains station refuel menu |
-| Undock sequencing | Done | `edap/routines/` — menu walk (UI_Back x10, HeadLookReset, UI_Down, UI_Select), polls for `Undocked` event; live-validated |
+| Undock sequencing | Done | `edap/routines/` — menu walk (UI_Back x10, HeadLookReset, UI_Down, UI_Select), polls for `Undocked` event (timeout 30s); live-validated. In-space confirmation step was reverted. |
 | Station / docked state detection | Partial | `edap/state.py` derives coarse statuses like `in_station`, `starting_docking`, and `in_docking`, but there is no dedicated docked/station snapshot model yet |
 | Hotkey registration | Parked | `keyboard` lib doesn't work on macOS; likely future direction is a menu-bar app |
 | Legacy autopilot loop migration | Not ported | `dev_autopilot.py` remains the behavior reference; new `edap/` routines are still minimal |
