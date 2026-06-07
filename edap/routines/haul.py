@@ -9,6 +9,7 @@ from edap.routines._base import RoutineResult, SupportsHaulControls, SupportsPol
 from edap.routines.docking import dock, undock
 from edap.routines.galaxy_map import set_gal_map_destination
 from edap.routines.market import market_buy, market_sell
+from edap.status import read_status
 
 
 def _read_cargo_json(journal_dir: Path) -> list[dict]:
@@ -28,6 +29,35 @@ def _sellable_cargo(inventory: list[dict]) -> list[dict]:
         and item.get("Stolen", 0) == 0
         and "MissionID" not in item
     ]
+
+
+def _escape_mass_lock(
+    controls: SupportsHaulControls,
+    *,
+    journal_dir: Path,
+    step_delay_s: float,
+    mass_lock_boost_delay_s: float,
+    sleeper: Callable[[float], None],
+    progress_fn: Callable[[str], None] | None,
+) -> None:
+    if progress_fn is not None:
+        progress_fn("Setting speed 100 to break auto-undock...")
+    speed_result = controls.set_speed_full()
+    if speed_result.status != "ok" and progress_fn is not None:
+        progress_fn(f"Warning: SetSpeed100 dispatch failed: {speed_result.reason}")
+    if step_delay_s > 0:
+        sleeper(step_delay_s)
+
+    while True:
+        status = read_status(journal_dir)
+        if status is None or not status.flags.fsd_mass_locked:
+            break
+        if progress_fn is not None:
+            progress_fn("FSD mass locked -- boosting away...")
+        boost_result = controls.boost()
+        if boost_result.status != "ok" and progress_fn is not None:
+            progress_fn(f"Warning: BoostButton dispatch failed: {boost_result.reason}")
+        sleeper(mass_lock_boost_delay_s)
 
 
 def haul_loop(
@@ -51,6 +81,7 @@ def haul_loop(
     galaxy_map_settle_s: float = 2.0,
     boost_settle_s: float = 3.0,
     deny_retry_delay_s: float = 5.0,
+    mass_lock_boost_delay_s: float = 5.0,
     max_dock_retries: int = 3,
     time_fn: Callable[[], float] = monotonic,
     sleeper: Callable[[float], None] = sleep,
@@ -134,6 +165,14 @@ def haul_loop(
                 map_settle_s=galaxy_map_settle_s,
                 progress_fn=progress_fn,
             )
+        _escape_mass_lock(
+            controls,
+            journal_dir=journal_dir,
+            step_delay_s=step_delay_s,
+            mass_lock_boost_delay_s=mass_lock_boost_delay_s,
+            sleeper=sleeper,
+            progress_fn=progress_fn,
+        )
 
         # Phase 3: wait for supercruise exit + dock at buy station
         if progress_fn is not None:
@@ -208,6 +247,14 @@ def haul_loop(
                 map_settle_s=galaxy_map_settle_s,
                 progress_fn=progress_fn,
             )
+        _escape_mass_lock(
+            controls,
+            journal_dir=journal_dir,
+            step_delay_s=step_delay_s,
+            mass_lock_boost_delay_s=mass_lock_boost_delay_s,
+            sleeper=sleeper,
+            progress_fn=progress_fn,
+        )
 
         # Phase 6: wait for supercruise exit + dock at sell station + auto-refuel
         if progress_fn is not None:

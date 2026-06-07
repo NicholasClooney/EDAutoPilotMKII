@@ -28,6 +28,7 @@ DEFAULT_SHIP_CONTROL_ACTIONS = [
     "UI_Select",
     "GalaxyMapOpen",
     "CamZoomIn",
+    "BoostButton",
 ]
 
 CONTINUOUS_ACTIONS = {

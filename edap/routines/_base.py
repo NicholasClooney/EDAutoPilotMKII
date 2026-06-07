@@ -11,6 +11,9 @@ class SupportsSetSpeedZero(Protocol):
     def set_speed_zero(self, repeat: int = 1, hold_s: float = 0.0) -> ActionDispatchResult:
         """Dispatch the SetSpeedZero action."""
 
+    def set_speed_full(self, repeat: int = 1, hold_s: float = 0.0) -> ActionDispatchResult:
+        """Dispatch the SetSpeed100 action."""
+
 
 class SupportsJumpControls(SupportsSetSpeedZero, Protocol):
     def hyper_super_combination(self, repeat: int = 1, hold_s: float = 0.0) -> ActionDispatchResult:

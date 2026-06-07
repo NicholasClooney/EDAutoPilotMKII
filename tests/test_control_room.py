@@ -36,6 +36,7 @@ def _make_config(journal_dir: Path) -> AppConfig:
             galaxy_map_settle_seconds=2.0,
             haul_dock_timeout_seconds=600.0,
             undock_timeout_seconds=30.0,
+            mass_lock_boost_delay_seconds=5.0,
         ),
         screen=ScreenConfig(
             resolution_width=1920,

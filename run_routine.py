@@ -675,6 +675,7 @@ def main() -> int:
                 ),
                 boost_settle_s=args.boost_settle_seconds,
                 deny_retry_delay_s=args.deny_retry_delay_seconds,
+                mass_lock_boost_delay_s=loaded.config.controls.mass_lock_boost_delay_seconds,
                 max_dock_retries=args.max_retries,
                 sleeper=logging_sleeper,
                 progress_fn=_progress,
