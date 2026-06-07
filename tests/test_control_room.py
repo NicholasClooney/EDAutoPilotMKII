@@ -114,6 +114,11 @@ class _HarnessApp(ControlRoomApp):
         self._resume_entries = self._filtered_resume_entries()
 
 
+class _InputStub:
+    def __init__(self) -> None:
+        self.placeholder = ""
+
+
 class ControlRoomCommandTests(unittest.TestCase):
     def setUp(self) -> None:
         self.tmpdir = tempfile.TemporaryDirectory()
@@ -283,6 +288,135 @@ class ControlRoomBindingsTests(unittest.TestCase):
         self.assertIn("Cargo.json fallback", output)
         self.assertIn("Sell-all complete", output)
         self.assertNotIn("Nothing sellable in cargo", output)
+
+    def test_haul_dispatch_does_not_require_starting_at_sell_station(self) -> None:
+        captured: dict[str, object] = {}
+
+        self.app._ship.status = "in_supercruise"
+        self.app._ship.station = ""
+        self.app._ship.system = "Sol"
+        self.app._haul_params = {
+            "commodity": "Aluminium",
+            "buy_station": "Trevithick Dock",
+            "sell_station": "Pawelczyk Dock",
+            "sell_system": "Sol",
+            "buy_system": "Achenar",
+            "galaxy_map_settle": "",
+            "dock_timeout": "",
+        }
+        self.app._controls = object()
+        self.app._make_progress = lambda: (lambda _: None)
+        self.app._make_controls = lambda progress: object()
+        self.app._make_sleeper = lambda: (lambda _: None)
+        self.app._make_watcher = lambda: object()
+        self.app._run_in_thread = lambda fn: fn()
+
+        def fake_haul_loop(controls, watcher, **kwargs):
+            captured["controls"] = controls
+            captured["watcher"] = watcher
+            captured["kwargs"] = kwargs
+            return RoutineResult(
+                action="haul_loop",
+                dispatch=ActionDispatchResult(action="haul_loop", status="ok"),
+            )
+
+        with patch("edap.control_room.routines_haul.haul_loop", new=fake_haul_loop):
+            self.app._dispatch_haul_loop()
+
+        self.assertIn("kwargs", captured)
+        self.assertFalse(any("requires you to be docked at the sell station" in msg for msg in self.app.logged))
+        self.assertIn("Starting haul loop:", "\n".join(self.app.logged))
+        self.assertEqual(captured["kwargs"]["confirm_fn"]("ignored"), False)
+
+    def test_haul_dispatch_prompts_to_confirm_unknown_buy_station(self) -> None:
+        self.app.query_one = lambda *args, **kwargs: _InputStub()  # type: ignore[method-assign]
+        self.app._ship.status = "in_station"
+        self.app._ship.station = "Mystery Base"
+        self.app._haul_params = {
+            "commodity": "Aluminium",
+            "buy_station": "",
+            "sell_station": "Pawelczyk Dock",
+            "sell_system": "Sol",
+            "buy_system": "",
+            "galaxy_map_settle": "",
+            "dock_timeout": "",
+        }
+
+        journal_file = Path(self.tmpdir.name) / "Journal.240101000000.01.log"
+        journal_file.write_text(
+            json.dumps({"event": "Docked", "StationName": "Mystery Base", "StarSystem": "Sol"}) + "\n",
+            encoding="utf-8",
+        )
+        (Path(self.tmpdir.name) / "Cargo.json").write_text(json.dumps({"Inventory": []}), encoding="utf-8")
+
+        self.app._dispatch_haul_loop()
+
+        self.assertEqual(self.app._haul_confirm_buy_station, "Mystery Base")
+        self.assertIn("Assume current station", "\n".join(self.app.logged))
+
+    def test_haul_confirm_yes_sets_buy_station_and_starts(self) -> None:
+        captured: dict[str, object] = {}
+        self.app.query_one = lambda *args, **kwargs: _InputStub()  # type: ignore[method-assign]
+
+        self.app._haul_params = {
+            "commodity": "Aluminium",
+            "buy_station": "",
+            "sell_station": "Pawelczyk Dock",
+            "sell_system": "Sol",
+            "buy_system": "",
+            "galaxy_map_settle": "",
+            "dock_timeout": "",
+        }
+        self.app._controls = object()
+        self.app._make_progress = lambda: (lambda _: None)
+        self.app._make_controls = lambda progress: object()
+        self.app._make_sleeper = lambda: (lambda _: None)
+        self.app._make_watcher = lambda: object()
+        self.app._run_in_thread = lambda fn: fn()
+
+        def fake_dispatch() -> None:
+            captured["buy_station"] = self.app._haul_params["buy_station"]
+
+        self.app._dispatch_haul_loop = fake_dispatch  # type: ignore[method-assign]
+        self.app._haul_confirm_buy_station = "Mystery Base"
+
+        self.app._handle_haul_confirm_prompt("yes")
+
+        self.assertEqual(captured["buy_station"], "Mystery Base")
+        self.assertEqual(self.app._haul_confirm_buy_station, "")
+
+    def test_haul_confirm_blank_defaults_to_yes(self) -> None:
+        captured: dict[str, object] = {}
+        self.app.query_one = lambda *args, **kwargs: _InputStub()  # type: ignore[method-assign]
+        self.app._haul_params = {
+            "commodity": "Aluminium",
+            "buy_station": "",
+            "sell_station": "Pawelczyk Dock",
+            "sell_system": "Sol",
+            "buy_system": "",
+            "galaxy_map_settle": "",
+            "dock_timeout": "",
+        }
+
+        def fake_dispatch() -> None:
+            captured["buy_station"] = self.app._haul_params["buy_station"]
+
+        self.app._dispatch_haul_loop = fake_dispatch  # type: ignore[method-assign]
+        self.app._haul_confirm_buy_station = "Mystery Base"
+
+        self.app._handle_haul_confirm_prompt("")
+
+        self.assertEqual(captured["buy_station"], "Mystery Base")
+        self.assertEqual(self.app._haul_confirm_buy_station, "")
+
+    def test_haul_confirm_no_cancels_launch(self) -> None:
+        self.app.query_one = lambda *args, **kwargs: _InputStub()  # type: ignore[method-assign]
+        self.app._haul_confirm_buy_station = "Mystery Base"
+
+        self.app._handle_haul_confirm_prompt("no")
+
+        self.assertEqual(self.app._haul_confirm_buy_station, "")
+        self.assertIn("Haul launch cancelled", "\n".join(self.app.logged))
 
     def test_record_history_entry_trims_to_configured_limit(self) -> None:
         self.app._config = self.app._config.__class__(

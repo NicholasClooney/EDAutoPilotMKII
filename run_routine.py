@@ -680,6 +680,7 @@ def main() -> int:
                 max_dock_retries=args.max_retries,
                 sleeper=logging_sleeper,
                 progress_fn=_progress,
+                confirm_fn=lambda _: False,
             )
         elif args.routine == ROUTINE_SET_GAL_MAP_DESTINATION:
             result = set_gal_map_destination(

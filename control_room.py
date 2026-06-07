@@ -223,6 +223,7 @@ class ControlRoomApp(App[None]):
         self._haul_params: dict[str, str] = {}
         self._haul_prompt_defaults: dict[str, str] = {}
         self._haul_prompt_step: str = ""  # "commodity" | "buy_station" | "sell_station" | "sell_system" | "buy_system" | "galaxy_map_settle" | "dock_timeout"
+        self._haul_confirm_buy_station: str = ""
         self._dest_prompt_destination: str = ""
         self._dest_prompt_settle_default: float | None = None
         self._history: list[str] = []
@@ -904,6 +905,35 @@ class ControlRoomApp(App[None]):
     def _cmd_haul(self, rest: str) -> None:
         routines_haul.cmd_haul(self, rest)
 
+    def _start_haul_confirm_prompt(self, station: str) -> None:
+        self._haul_confirm_buy_station = station
+        self._log(
+            f"[dim]Assume current station [cyan]{escape(station)}[/] is the buy station? "
+            f"(Enter = yes, no to cancel)[/]"
+        )
+        self.query_one("#cmd", Input).placeholder = "confirm buy station? Enter = yes, no to cancel..."
+
+    def _handle_haul_confirm_prompt(self, value: str) -> None:
+        answer = value.strip().lower()
+        if answer in {"", "y", "yes"}:
+            station = self._haul_confirm_buy_station
+            self._haul_confirm_buy_station = ""
+            self._haul_params["buy_station"] = station
+            self._log(f"  Buy station confirmed: [cyan]{escape(station)}[/]")
+            self.query_one("#cmd", Input).placeholder = _DEFAULT_COMMAND_PLACEHOLDER
+            self._dispatch_haul_loop()
+            return
+        if answer in {"n", "no"}:
+            station = self._haul_confirm_buy_station
+            self._haul_confirm_buy_station = ""
+            self._log(
+                f"[yellow]Haul launch cancelled — buy station left unresolved "
+                f"for [cyan]{escape(station)}[/].[/]"
+            )
+            self.query_one("#cmd", Input).placeholder = _DEFAULT_COMMAND_PLACEHOLDER
+            return
+        self._log("[red]Press Enter for yes, or type no to cancel.[/]")
+
     def _handle_haul_prompt(self, value: str) -> None:
         if self._haul_prompt_step == "commodity":
             resolved = value.strip() or self._haul_prompt_defaults.get("commodity", "")
@@ -1064,7 +1094,7 @@ class ControlRoomApp(App[None]):
         self.exit()
 
     def action_open_history(self) -> None:
-        if self._haul_prompt_step or self._dest_prompt_destination:
+        if self._haul_prompt_step or self._haul_confirm_buy_station or self._dest_prompt_destination:
             return
         if self._resume_open:
             self._close_resume_picker()
@@ -1102,7 +1132,7 @@ class ControlRoomApp(App[None]):
                 self._resume_filter += event.character
                 self._refresh_resume_picker()
             return
-        if self._haul_prompt_step or self._dest_prompt_destination:
+        if self._haul_prompt_step or self._haul_confirm_buy_station or self._dest_prompt_destination:
             return  # don't interfere with multi-step haul prompts
         if event.key not in ("up", "down"):
             return
@@ -1133,6 +1163,9 @@ class ControlRoomApp(App[None]):
 
         if self._haul_prompt_step:
             self._handle_haul_prompt(raw)
+            return
+        if self._haul_confirm_buy_station:
+            self._handle_haul_confirm_prompt(raw)
             return
         if self._dest_prompt_destination:
             destination = self._dest_prompt_destination

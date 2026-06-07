@@ -4,6 +4,7 @@ Tightly coupled to ControlRoomApp — split for file size.
 """
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING
 
 from rich.markup import escape
@@ -11,9 +12,23 @@ from rich.markup import escape
 from edap.control_room.history import now_iso
 from edap.control_room_state import CommandHistoryEntry
 from edap.routines import haul_loop
+from edap.routines.haul import _detect_phase
 
 if TYPE_CHECKING:
     from control_room import ControlRoomApp
+
+
+_CONFIRM_STATION_RE = re.compile(r"^Assume current station (.+) is the buy station\?$")
+
+
+def _station_from_confirmation_prompt(prompt: str) -> str:
+    match = _CONFIRM_STATION_RE.match(prompt)
+    if match is None:
+        return ""
+    raw_station = match.group(1)
+    if len(raw_station) >= 2 and raw_station[0] == raw_station[-1] and raw_station[0] in {"'", '"'}:
+        return raw_station[1:-1]
+    return raw_station
 
 
 def cmd_haul(app: ControlRoomApp, rest: str) -> None:
@@ -35,19 +50,15 @@ def dispatch_haul_loop(app: ControlRoomApp) -> None:
     galaxy_map_settle_raw = app._haul_params.get("galaxy_map_settle", "")
     dock_timeout_raw = app._haul_params.get("dock_timeout", "")
 
-    if app._ship.status != "in_station":
-        app._log("[red]Haul loop requires you to be docked at the sell station before starting.[/]")
-        return
-
     if not sell_station and app._ship.station:
         sell_station = app._ship.station
         app._log(f"[dim]Sell station defaulting to current station: [cyan]{escape(sell_station)}[/][/]")
-    elif sell_station and app._ship.station:
+    elif sell_station and app._ship.status == "in_station" and app._ship.station:
         if app._ship.station.lower() != sell_station.lower():
             app._log(
                 f"[yellow]Warning: docked at [bold]{escape(app._ship.station)}[/bold] "
-                f"but sell station is [bold]{escape(sell_station)}[/bold] — "
-                f"haul loop expects you to start at the sell station.[/]"
+                f"but sell station is [bold]{escape(sell_station)}[/bold]. "
+                f"Haul resume detection will use the configured stations and cargo state.[/]"
             )
 
     if not sell_system and app._ship.system:
@@ -70,6 +81,26 @@ def dispatch_haul_loop(app: ControlRoomApp) -> None:
     )
     journal_dir = app._journal_dir
     watcher = app._make_watcher()
+
+    confirmation_prompts: list[str] = []
+    try:
+        _detect_phase(
+            journal_dir,
+            sell_station=sell_station,
+            buy_station=buy_station,
+            sell_system=sell_system,
+            buy_system=buy_system,
+            commodity=commodity,
+            confirm_fn=lambda message: confirmation_prompts.append(message) or False,
+        )
+    except RuntimeError as exc:
+        if confirmation_prompts:
+            station = _station_from_confirmation_prompt(confirmation_prompts[0])
+            if station:
+                app._start_haul_confirm_prompt(station)
+                return
+        app._log(f"[red]{escape(str(exc))}[/]")
+        return
 
     app._record_history_entry(CommandHistoryEntry(
         raw=f"haul {commodity}",
@@ -116,4 +147,5 @@ def dispatch_haul_loop(app: ControlRoomApp) -> None:
         mass_lock_boost_delay_s=app._config.controls.mass_lock_boost_delay_seconds,
         sleeper=sleeper,
         progress_fn=progress,
+        confirm_fn=lambda _: False,
     ))
