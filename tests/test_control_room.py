@@ -274,7 +274,7 @@ class ControlRoomBindingsTests(unittest.TestCase):
                 dispatch=ActionDispatchResult(action="market_sell", status="ok"),
             )
 
-        with patch("control_room.market_sell", new=fake_market_sell):
+        with patch("edap.control_room.routines_trade.market_sell", new=fake_market_sell):
             self.app._sell_all()
 
         output = "\n".join(self.app.logged)

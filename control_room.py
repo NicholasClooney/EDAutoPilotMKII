@@ -60,6 +60,12 @@ from edap.control_room.history import (
     resume_summary as _resume_summary,
 )
 from edap.control_room.models import MarketData, ReplaySelection, ShipState
+from edap.control_room.routines_trade import (
+    cmd_buy as _cmd_buy_impl,
+    cmd_sell as _cmd_sell_impl,
+    sell_all as _sell_all_impl,
+    sell_item as _sell_item_impl,
+)
 from edap.control_room.routines_nav import (
     cmd_dest as _cmd_dest_impl,
     dispatch_dest as _dispatch_dest_impl,
@@ -80,7 +86,7 @@ from edap.control_room_state import (
     save_control_room_state,
 )
 from edap.progress_controls import ProgressShipControls
-from edap.routines import haul_loop, market_buy, market_sell
+from edap.routines import haul_loop
 from edap.runtime import RuntimeContext, build_runtime_context, load_config_with_fallback
 from edap.ship_controls import DEFAULT_SHIP_CONTROL_ACTIONS, ShipControls
 from edap.state import JournalWatcher, get_latest_journal_log, read_ship_state
@@ -150,34 +156,6 @@ def _is_recent(ev: dict[str, Any], threshold_s: float = 120.0) -> bool:
         return True
 
 
-def _parse_amount(s: str) -> int | str | None:
-    if s.upper() == "MAX":
-        return "MAX"
-    try:
-        n = int(s)
-        return n if n > 0 else None
-    except ValueError:
-        return None
-
-
-def _read_cargo_inventory(journal_dir: Path) -> list[dict[str, Any]]:
-    cargo_path = journal_dir / "Cargo.json"
-    try:
-        with cargo_path.open() as fh:
-            data = json.load(fh)
-        inventory = data.get("Inventory", [])
-        return inventory if isinstance(inventory, list) else []
-    except (OSError, json.JSONDecodeError):
-        return []
-
-
-def _sellable_cargo(inventory: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    return [
-        item for item in inventory
-        if item.get("Count", 0) > 0
-        and item.get("Stolen", 0) == 0
-        and "MissionID" not in item
-    ]
 # ── App ────────────────────────────────────────────────────────────────────────
 
 
@@ -917,146 +895,16 @@ class ControlRoomApp(App[None]):
             self.query_one("#cmd", Input).placeholder = "buy station (Enter to skip)..."
 
     def _cmd_buy(self, rest: str) -> None:
-        if not self._check_routine_ready():
-            return
-        parts = rest.split(None, 1)
-        if not parts:
-            self._log("[red]Usage: buy <item> [amount|max][/]")
-            return
-        target = parts[0]
-        amount = _parse_amount(parts[1].strip() if len(parts) > 1 else "MAX")
-        if amount is None:
-            self._log(f"[red]Invalid amount — use a positive integer or MAX[/]")
-            return
-        self._record_history_entry(CommandHistoryEntry(
-            raw=f"buy {rest}",
-            command="buy",
-            params={"target": target, "amount": amount},
-            timestamp=_now_iso(),
-        ))
-
-        progress = self._make_progress()
-        controls = self._make_controls(progress)
-        sleeper = self._make_sleeper()
-        step_delay = self._config.controls.step_delay_seconds
-        nav_delay = self._config.controls.market_nav_delay_seconds
-        market_path = self._market_path
-        watcher = self._make_watcher()
-
-        self._routine_active = True
-        amt_label = str(amount) + ("t" if isinstance(amount, int) else "")
-        self._log(f"Buying {amt_label} [cyan]{escape(target)}[/]...")
-        self._routine_worker = self._run_in_thread(lambda: market_buy(
-            controls,
-            watcher,
-            market_path=market_path,
-            target=target,
-            amount=amount,
-            step_delay_s=step_delay,
-            nav_delay_s=nav_delay,
-            sleeper=sleeper,
-            progress_fn=progress,
-        ))
+        _cmd_buy_impl(self, rest)
 
     def _cmd_sell(self, rest: str) -> None:
-        if not self._check_routine_ready():
-            return
-        if rest:
-            parts = rest.split(None, 1)
-            target = parts[0]
-            amount = _parse_amount(parts[1].strip() if len(parts) > 1 else "MAX")
-            if amount is None:
-                self._log("[red]Invalid amount — use a positive integer or MAX[/]")
-                return
-            self._record_history_entry(CommandHistoryEntry(
-                raw=f"sell {rest}",
-                command="sell",
-                params={"target": target, "amount": amount},
-                timestamp=_now_iso(),
-            ))
-            self._sell_item(target, amount)
-        else:
-            self._record_history_entry(CommandHistoryEntry(
-                raw="sell",
-                command="sell",
-                params={"mode": "all"},
-                timestamp=_now_iso(),
-            ))
-            self._sell_all()
+        _cmd_sell_impl(self, rest)
 
     def _sell_item(self, target: str, amount: int | str) -> None:
-        progress = self._make_progress()
-        controls = self._make_controls(progress)
-        sleeper = self._make_sleeper()
-        step_delay = self._config.controls.step_delay_seconds
-        nav_delay = self._config.controls.market_nav_delay_seconds
-        market_path = self._market_path
-        watcher = self._make_watcher()
-
-        self._routine_active = True
-        amt_label = str(amount) + ("t" if isinstance(amount, int) else "")
-        self._log(f"Selling {amt_label} [cyan]{escape(target)}[/]...")
-        self._routine_worker = self._run_in_thread(lambda: market_sell(
-            controls, watcher,
-            market_path=market_path,
-            target=target,
-            amount=amount,
-            step_delay_s=step_delay,
-            nav_delay_s=nav_delay,
-            sleeper=sleeper,
-            progress_fn=progress,
-        ))
+        _sell_item_impl(self, target, amount)
 
     def _sell_all(self) -> None:
-        inventory = _sellable_cargo(self._ship.cargo_inventory)
-        used_fallback = False
-        if not inventory:
-            inventory = _sellable_cargo(_read_cargo_inventory(self._journal_dir))
-            used_fallback = bool(inventory)
-        if not inventory:
-            self._log("[yellow]Nothing sellable in cargo (empty, all stolen, or all mission cargo)[/]")
-            return
-
-        progress = self._make_progress()
-        controls = self._make_controls(progress)
-        sleeper = self._make_sleeper()
-        step_delay = self._config.controls.step_delay_seconds
-        nav_delay = self._config.controls.market_nav_delay_seconds
-        market_path = self._market_path
-        watcher = self._make_watcher()
-
-        names = ", ".join(item.get("Name_Localised") or item.get("Name", "?") for item in inventory)
-        if used_fallback:
-            self._log("[yellow]Cargo journal state was empty; using Cargo.json fallback for sell-all[/]")
-        self._log(f"Selling all cargo: [cyan]{escape(names)}[/]")
-        self._routine_active = True
-
-        def run_all() -> None:
-            for item in inventory:
-                self._raise_if_worker_cancelled()
-                name = item.get("Name_Localised") or item.get("Name", "?")
-                self.call_from_thread(self._log, f"  → [cyan]{escape(name)}[/] (MAX)...")
-                try:
-                    result = market_sell(
-                        controls, watcher,
-                        market_path=market_path,
-                        target=name,
-                        amount="MAX",
-                        step_delay_s=step_delay,
-                        nav_delay_s=nav_delay,
-                        sleeper=sleeper,
-                        progress_fn=progress,
-                    )
-                    status = result.dispatch.status
-                    color = "green" if status == "ok" else "yellow"
-                    self.call_from_thread(self._log, f"  [{color}]{escape(name)}: {escape(status)}[/]")
-                except Exception as exc:
-                    self.call_from_thread(
-                        self._log, f"  [yellow]Skipped {escape(name)}: {escape(str(exc))}[/]"
-                    )
-            self.call_from_thread(self._log, "[green]Sell-all complete[/]")
-
-        self._routine_worker = self._run_in_thread(run_all)
+        _sell_all_impl(self)
 
     def _cmd_haul(self, rest: str) -> None:
         if not self._check_routine_ready():
