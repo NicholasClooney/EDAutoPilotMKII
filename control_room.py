@@ -50,6 +50,7 @@ from textual.widgets import Footer, Header, Input, OptionList, RichLog, Static
 from textual.worker import get_current_worker
 
 from edap.config import AppConfig
+from edap.control_room import commands as _commands
 from edap.control_room.help import CONTROL_ROOM_COMMAND_INDEX, CONTROL_ROOM_COMMANDS
 from edap.control_room.history import (
     default_haul_matches as _default_haul_matches_pure,
@@ -1147,62 +1148,7 @@ class ControlRoomApp(App[None]):
         self._dispatch_command(raw)
 
     def _dispatch_command(self, raw: str) -> None:
-        self._log(f"[dim]Command: {escape(raw)}[/]")
-        cmd = raw.lower()
-        if cmd in {"q", "quit", "exit"}:
-            self._record_history_entry(CommandHistoryEntry(raw=raw, command="quit", timestamp=_now_iso()))
-            self._request_shutdown("quit command")
-            return
-
-        parts = cmd.split(None, 1)
-        verb = parts[0]
-        rest = parts[1].strip() if len(parts) > 1 else ""
-        raw_parts = raw.split(None, 1)
-        raw_rest = raw_parts[1].strip() if len(raw_parts) > 1 else ""
-
-        if verb == "dock":
-            self._record_history_entry(CommandHistoryEntry(raw=raw, command="dock", timestamp=_now_iso()))
-            self._cmd_dock()
-        elif verb == "undock":
-            self._record_history_entry(CommandHistoryEntry(raw=raw, command="undock", timestamp=_now_iso()))
-            self._cmd_undock()
-        elif verb == "jump":
-            self._record_history_entry(CommandHistoryEntry(raw=raw, command="jump", timestamp=_now_iso()))
-            self._cmd_jump()
-        elif verb == "escape":
-            self._record_history_entry(CommandHistoryEntry(raw=raw, command="escape", timestamp=_now_iso()))
-            self._cmd_escape()
-        elif verb == "boost":
-            self._record_history_entry(CommandHistoryEntry(raw=raw, command="boost", timestamp=_now_iso()))
-            self._cmd_boost()
-        elif verb == "buy":
-            self._cmd_buy(raw_rest)
-        elif verb == "sell":
-            self._cmd_sell(raw_rest)
-        elif verb == "haul":
-            self._cmd_haul(raw_rest)
-        elif verb in {"dest", "set_dest"}:
-            if not raw_rest:
-                self._log("[red]Usage: dest <system name>[/]")
-            else:
-                self._cmd_dest(raw_rest)
-        elif verb == "market":
-            self._record_history_entry(CommandHistoryEntry(raw=raw, command="market", params={"value": raw_rest}, timestamp=_now_iso()))
-            self._cmd_market(raw_rest)
-        elif verb == "verbose":
-            self._record_history_entry(CommandHistoryEntry(raw=raw, command="verbose", params={"value": rest}, timestamp=_now_iso()))
-            self._cmd_verbose(rest)
-        elif verb == "commands":
-            self._record_history_entry(CommandHistoryEntry(raw=raw, command="commands", timestamp=_now_iso()))
-            self._cmd_commands()
-        elif verb in {"help", "?"}:
-            self._record_history_entry(CommandHistoryEntry(raw=raw, command="help", params={"topic": raw_rest}, timestamp=_now_iso()))
-            self._cmd_help(raw_rest)
-        elif verb in {"replay", "history"}:
-            self._record_history_entry(CommandHistoryEntry(raw=raw, command="replay", timestamp=_now_iso()))
-            self._cmd_resume()
-        else:
-            self._log(f"[dim]Unknown command: {escape(raw)}[/]")
+        _commands.dispatch(self, raw)
 
     def _parse_optional_nonnegative_float(self, raw: str, *, default: float, label: str) -> float | None:
         value = raw.strip()
@@ -1218,68 +1164,6 @@ class ControlRoomApp(App[None]):
             return None
         return parsed
 
-    def _cmd_commands(self) -> None:
-        self._log("[dim]Supported commands:[/]")
-        for command in CONTROL_ROOM_COMMANDS:
-            aliases = f" [dim](aliases: {', '.join(command.aliases)})[/]" if command.aliases else ""
-            self._log(f"[bold]{escape(command.usage)}[/] — {escape(command.summary)}{aliases}")
-
-    def _cmd_resume(self) -> None:
-        self._show_resume_picker()
-
-    def _cmd_help(self, rest: str) -> None:
-        topic = rest.strip().lower()
-        if not topic:
-            self._log("[dim]Use [bold]commands[/] to list everything, or [bold]help <command>[/] for one command in plain English.[/]")
-            return
-
-        command = CONTROL_ROOM_COMMAND_INDEX.get(topic)
-        if command is None:
-            self._log(f"[red]Unknown help topic: {escape(rest)}[/]")
-            return
-
-        aliases = f"  Aliases: {', '.join(command.aliases)}" if command.aliases else ""
-        self._log(
-            f"[bold]{escape(command.name)}[/] — {escape(command.usage)}"
-            f"{f'[dim]{escape(aliases)}[/]' if aliases else ''}"
-        )
-        self._log(escape(command.detail))
-
-    def _cmd_verbose(self, rest: str) -> None:
-        if rest in {"on", "1", "true"}:
-            self._verbose_controls = True
-            self._log("[dim]Verbose key logging on — key presses will appear in the activity log.[/]")
-        elif rest in {"off", "0", "false", ""}:
-            self._verbose_controls = False
-            self._log("[dim]Verbose key logging off.[/]")
-        else:
-            state = "on" if self._verbose_controls else "off"
-            self._log(f"[dim]verbose {state}  —  use: verbose on | verbose off[/]")
-
-    def _cmd_market(self, rest: str) -> None:
-        rest_lower = rest.lower()
-        if rest_lower == "lock":
-            self._market.locked = True
-            self._log("[dim]Market panel locked.[/]")
-            self._refresh_market()
-        elif rest_lower == "unlock":
-            self._market.locked = False
-            self._log("[dim]Market panel unlocked.[/]")
-            self._load_market_json()
-            self._refresh_market()
-        elif rest_lower.startswith("filter "):
-            term = rest[7:].strip()
-            if not term:
-                self._log("[red]Usage: market filter <item name>[/]")
-                return
-            self._market_filter = term.title()
-            self._log(f"[dim]Market filter: {escape(self._market_filter)}[/]")
-            self._refresh_market()
-        else:
-            # market / market clear — both clear the filter
-            self._market_filter = None
-            self._log("[dim]Market filter cleared.[/]")
-            self._refresh_market()
 
     def on_option_list_option_highlighted(self, message: OptionList.OptionHighlighted) -> None:
         if message.option_list.id == "resume-list":
