@@ -112,6 +112,7 @@ class ControlRoomCommandTests(unittest.TestCase):
         self.app._dispatch_command("commands")
 
         output = "\n".join(self.app.logged)
+        self.assertIn("Command: commands", output)
         self.assertIn("Supported commands:", output)
         self.assertIn("dock", output)
         self.assertIn("help", output)
@@ -128,7 +129,9 @@ class ControlRoomCommandTests(unittest.TestCase):
     def test_help_unknown_topic_reports_error(self) -> None:
         self.app._dispatch_command("help mystery")
 
-        self.assertEqual(self.app.logged, ["[red]Unknown help topic: mystery[/]"])
+        output = "\n".join(self.app.logged)
+        self.assertIn("Command: help mystery", output)
+        self.assertIn("Unknown help topic: mystery", output)
 
     def test_quit_command_exits_immediately_without_active_routine(self) -> None:
         self.app._dispatch_command("quit")

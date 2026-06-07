@@ -1464,6 +1464,7 @@ class ControlRoomApp(App[None]):
         self._dispatch_command(raw)
 
     def _dispatch_command(self, raw: str) -> None:
+        self._log(f"[dim]Command: {escape(raw)}[/]")
         cmd = raw.lower()
         if cmd in {"q", "quit", "exit"}:
             self._record_history_entry(CommandHistoryEntry(raw=raw, command="quit", timestamp=_now_iso()))
