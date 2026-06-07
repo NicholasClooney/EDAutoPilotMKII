@@ -35,7 +35,6 @@ import argparse
 import json
 import sys
 import time
-from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Callable
@@ -49,6 +48,8 @@ from textual.widgets import Footer, Header, Input, OptionList, RichLog, Static
 from textual.worker import get_current_worker
 
 from edap.config import AppConfig
+from edap.control_room.help import CONTROL_ROOM_COMMAND_INDEX, CONTROL_ROOM_COMMANDS
+from edap.control_room.models import MarketData, ReplaySelection, ShipState
 from edap.control_room_state import (
     CommandHistoryEntry,
     ControlRoomState,
@@ -78,50 +79,6 @@ _ALL_ROUTINE_ACTIONS = [
 _DEFAULT_COMMAND_PLACEHOLDER = "commands | help dock | replay | dock | undock | buy <item> [N] | sell [item] | haul [commodity] | dest <system> | market ... | q"
 
 
-# ── State ──────────────────────────────────────────────────────────────────────
-
-
-@dataclass
-class _ShipState:
-    commander: str | None = None
-    ship_type: str | None = None
-    system: str | None = None
-    station: str | None = None
-    status: str | None = None
-    fuel_level: float | None = None
-    fuel_capacity: float | None = None
-    credits: int | None = None
-    cargo_count: int = 0
-    cargo_capacity: int | None = None
-    cargo_inventory: list[dict[str, Any]] = field(default_factory=list)
-    target: str | None = None
-
-
-@dataclass
-class _MarketData:
-    station: str = ""
-    system: str = ""
-    timestamp: str = ""
-    items: list[dict[str, Any]] = field(default_factory=list)
-    locked: bool = False
-
-
-@dataclass(frozen=True)
-class _CommandHelp:
-    name: str
-    usage: str
-    summary: str
-    detail: str
-    aliases: tuple[str, ...] = ()
-
-
-@dataclass
-class _ResumeSelection:
-    entry: CommandHistoryEntry
-    label: str
-    detail: str
-
-
 class _RoutineCancelled(Exception):
     """Raised when a control-room routine worker is cancelled."""
 
@@ -141,98 +98,6 @@ class _CancellationProxy:
             return attr(*args, **kwargs)
 
         return wrapped
-
-
-_COMMANDS: list[_CommandHelp] = [
-    _CommandHelp(
-        name="dock",
-        usage="dock",
-        summary="Dock at the current station target and auto-refuel after touchdown.",
-        detail="Starts the docking routine. If you're already in normal space it skips the supercruise-exit wait; otherwise it waits for the drop, sends the docking request menu flow, and auto-refuels after docking.",
-    ),
-    _CommandHelp(
-        name="undock",
-        usage="undock",
-        summary="Launch from the current station and wait for the Undocked journal event.",
-        detail="Runs the station launch menu flow, then waits for the journal to confirm that the ship has actually undocked before reporting success.",
-    ),
-    _CommandHelp(
-        name="jump",
-        usage="jump",
-        summary="Trigger the FSD jump sequence and zero throttle on arrival.",
-        detail="Sends the hyperspace control, waits for the jump to start, waits to re-enter supercruise at the destination, then sets speed to zero.",
-    ),
-    _CommandHelp(
-        name="buy",
-        usage="buy <item> [amount|max]",
-        summary="Buy a commodity from the current station market.",
-        detail="Opens the commodities market, finds the named item in the buy list, sets the requested quantity or MAX, confirms the trade, and waits for a MarketBuy journal event.",
-    ),
-    _CommandHelp(
-        name="sell",
-        usage="sell [item] [amount|max]",
-        summary="Sell cargo from the current station market.",
-        detail="With an item name it sells that commodity. With no item it walks your cargo manifest and tries to sell every non-stolen, non-mission cargo item, skipping items the market won't buy.",
-    ),
-    _CommandHelp(
-        name="haul",
-        usage="haul [commodity]",
-        summary="Run the community haul loop, prompting for missing stations and systems.",
-        detail="Starts the sell-undock-travel-buy-undock-travel cycle for one commodity. Control room prompts for the missing haul parameters before launching the loop, including the galaxy-map settle delay used by route plotting and the docking timeout for station arrival.",
-    ),
-    _CommandHelp(
-        name="dest",
-        usage="dest <system>",
-        summary="Open the galaxy map and plot a route to a named system.",
-        detail="Opens the galaxy map, types the destination into search, plots the route, verifies NavRoute.json, and closes the map again. Control room also prompts for the galaxy-map settle delay, with Enter accepting the configured default.",
-        aliases=("set_dest",),
-    ),
-    _CommandHelp(
-        name="market",
-        usage="market | market clear | market filter <name> | market lock | market unlock",
-        summary="Control the market panel filter and lock state.",
-        detail="Use 'market filter <name>' to filter visible items, 'market' or 'market clear' to remove the filter, 'market lock' to freeze the panel to the current station, and 'market unlock' to resume live updates.",
-    ),
-    _CommandHelp(
-        name="verbose",
-        usage="verbose [on|off]",
-        summary="Turn verbose keypress logging on or off.",
-        detail="When verbose mode is on, individual key presses from routine dispatch are written into the activity log. When off, only higher-level progress messages are shown.",
-    ),
-    _CommandHelp(
-        name="commands",
-        usage="commands",
-        summary="List every supported control-room command.",
-        detail="Prints the command names and their one-line summaries so you can discover what control room currently supports.",
-    ),
-    _CommandHelp(
-        name="help",
-        usage="help [command]",
-        summary="Show general help or explain one command in plain English.",
-        detail="With no argument it explains how to discover commands. With a command name, it prints that command's usage, aliases, and what it is meant to do in human terms.",
-        aliases=("?",),
-    ),
-    _CommandHelp(
-        name="replay",
-        usage="replay",
-        summary="Open the replay history browser for execute-or-edit replay.",
-        detail="Shows recent saved commands across sessions in the activity-pane replay browser. Press Enter to execute the selected entry immediately, press e to reopen it for editing, or press * on a haul entry to save or clear it as the default haul setup.",
-        aliases=("history",),
-    ),
-    _CommandHelp(
-        name="quit",
-        usage="q | quit | exit",
-        summary="Cancel active work if needed, then shut down control room cleanly.",
-        detail="Starts the control-room shutdown path. If a routine is running, control room cancels it first and exits after the worker unwinds; otherwise it exits immediately.",
-        aliases=("q", "exit"),
-    ),
-]
-
-_COMMAND_INDEX: dict[str, _CommandHelp] = {}
-for _command in _COMMANDS:
-    _COMMAND_INDEX[_command.name] = _command
-    for _alias in _command.aliases:
-        _COMMAND_INDEX[_alias] = _command
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -376,8 +241,8 @@ class ControlRoomApp(App[None]):
         self._config: AppConfig = ctx.config
         self._journal_dir: Path = ctx.journal.effective_path  # type: ignore[assignment]
         self._market_path = self._journal_dir / "Market.json"
-        self._ship = _ShipState()
-        self._market = _MarketData()
+        self._ship = ShipState()
+        self._market = MarketData()
         self._market_filter = market_filter
         self._market_mtime: float | None = None
         self._controls: ShipControls | None = None
@@ -393,7 +258,7 @@ class ControlRoomApp(App[None]):
         self._history_draft: str = ""  # saved draft while navigating history
         self._state_path: Path = self._config.control_room.state_file
         self._saved_state = ControlRoomState()
-        self._resume_entries: list[_ResumeSelection] = []
+        self._resume_entries: list[ReplaySelection] = []
         self._resume_open = False
         self._shutdown_requested: bool = False
         self._shutdown_finalized: bool = False
@@ -604,7 +469,7 @@ class ControlRoomApp(App[None]):
             return
 
         self._resume_entries = [
-            _ResumeSelection(
+            ReplaySelection(
                 entry=entry,
                 label=self._resume_label(entry),
                 detail=_resume_detail(entry),
@@ -627,7 +492,7 @@ class ControlRoomApp(App[None]):
         option_list = self.query_one("#resume-list", OptionList)
         highlighted = option_list.highlighted or 0
         self._resume_entries = [
-            _ResumeSelection(
+            ReplaySelection(
                 entry=entry,
                 label=self._resume_label(entry),
                 detail=_resume_detail(entry),
@@ -741,7 +606,7 @@ class ControlRoomApp(App[None]):
         try:
             with self._market_path.open() as fh:
                 data = json.load(fh)
-            self._market = _MarketData(
+            self._market = MarketData(
                 station=data.get("StationName", "?"),
                 system=data.get("StarSystem", "?"),
                 timestamp=data.get("timestamp", ""),
@@ -1630,7 +1495,7 @@ class ControlRoomApp(App[None]):
 
     def _cmd_commands(self) -> None:
         self._log("[dim]Supported commands:[/]")
-        for command in _COMMANDS:
+        for command in CONTROL_ROOM_COMMANDS:
             aliases = f" [dim](aliases: {', '.join(command.aliases)})[/]" if command.aliases else ""
             self._log(f"[bold]{escape(command.usage)}[/] — {escape(command.summary)}{aliases}")
 
@@ -1643,7 +1508,7 @@ class ControlRoomApp(App[None]):
             self._log("[dim]Use [bold]commands[/] to list everything, or [bold]help <command>[/] for one command in plain English.[/]")
             return
 
-        command = _COMMAND_INDEX.get(topic)
+        command = CONTROL_ROOM_COMMAND_INDEX.get(topic)
         if command is None:
             self._log(f"[red]Unknown help topic: {escape(rest)}[/]")
             return

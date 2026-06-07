@@ -1,0 +1,95 @@
+from __future__ import annotations
+
+from edap.control_room.models import CommandHelp
+
+
+CONTROL_ROOM_COMMANDS: list[CommandHelp] = [
+    CommandHelp(
+        name="dock",
+        usage="dock",
+        summary="Dock at the current station target and auto-refuel after touchdown.",
+        detail="Starts the docking routine. If you're already in normal space it skips the supercruise-exit wait; otherwise it waits for the drop, sends the docking request menu flow, and auto-refuels after docking.",
+    ),
+    CommandHelp(
+        name="undock",
+        usage="undock",
+        summary="Launch from the current station and wait for the Undocked journal event.",
+        detail="Runs the station launch menu flow, then waits for the journal to confirm that the ship has actually undocked before reporting success.",
+    ),
+    CommandHelp(
+        name="jump",
+        usage="jump",
+        summary="Trigger the FSD jump sequence and zero throttle on arrival.",
+        detail="Sends the hyperspace control, waits for the jump to start, waits to re-enter supercruise at the destination, then sets speed to zero.",
+    ),
+    CommandHelp(
+        name="buy",
+        usage="buy <item> [amount|max]",
+        summary="Buy a commodity from the current station market.",
+        detail="Opens the commodities market, finds the named item in the buy list, sets the requested quantity or MAX, confirms the trade, and waits for a MarketBuy journal event.",
+    ),
+    CommandHelp(
+        name="sell",
+        usage="sell [item] [amount|max]",
+        summary="Sell cargo from the current station market.",
+        detail="With an item name it sells that commodity. With no item it walks your cargo manifest and tries to sell every non-stolen, non-mission cargo item, skipping items the market won't buy.",
+    ),
+    CommandHelp(
+        name="haul",
+        usage="haul [commodity]",
+        summary="Run the community haul loop, prompting for missing stations and systems.",
+        detail="Starts the sell-undock-travel-buy-undock-travel cycle for one commodity. Control room prompts for the missing haul parameters before launching the loop, including the galaxy-map settle delay used by route plotting and the docking timeout for station arrival.",
+    ),
+    CommandHelp(
+        name="dest",
+        usage="dest <system>",
+        summary="Open the galaxy map and plot a route to a named system.",
+        detail="Opens the galaxy map, types the destination into search, plots the route, verifies NavRoute.json, and closes the map again. Control room also prompts for the galaxy-map settle delay, with Enter accepting the configured default.",
+        aliases=("set_dest",),
+    ),
+    CommandHelp(
+        name="market",
+        usage="market | market clear | market filter <name> | market lock | market unlock",
+        summary="Control the market panel filter and lock state.",
+        detail="Use 'market filter <name>' to filter visible items, 'market' or 'market clear' to remove the filter, 'market lock' to freeze the panel to the current station, and 'market unlock' to resume live updates.",
+    ),
+    CommandHelp(
+        name="verbose",
+        usage="verbose [on|off]",
+        summary="Turn verbose keypress logging on or off.",
+        detail="When verbose mode is on, individual key presses from routine dispatch are written into the activity log. When off, only higher-level progress messages are shown.",
+    ),
+    CommandHelp(
+        name="commands",
+        usage="commands",
+        summary="List every supported control-room command.",
+        detail="Prints the command names and their one-line summaries so you can discover what control room currently supports.",
+    ),
+    CommandHelp(
+        name="help",
+        usage="help [command]",
+        summary="Show general help or explain one command in plain English.",
+        detail="With no argument it explains how to discover commands. With a command name, it prints that command's usage, aliases, and what it is meant to do in human terms.",
+        aliases=("?",),
+    ),
+    CommandHelp(
+        name="replay",
+        usage="replay",
+        summary="Open the replay history browser for execute-or-edit replay.",
+        detail="Shows recent saved commands across sessions in the activity-pane replay browser. Press Enter to execute the selected entry immediately, press e to reopen it for editing, or press * on a haul entry to save or clear it as the default haul setup.",
+        aliases=("history",),
+    ),
+    CommandHelp(
+        name="quit",
+        usage="q | quit | exit",
+        summary="Cancel active work if needed, then shut down control room cleanly.",
+        detail="Starts the control-room shutdown path. If a routine is running, control room cancels it first and exits after the worker unwinds; otherwise it exits immediately.",
+        aliases=("q", "exit"),
+    ),
+]
+
+CONTROL_ROOM_COMMAND_INDEX: dict[str, CommandHelp] = {}
+for command in CONTROL_ROOM_COMMANDS:
+    CONTROL_ROOM_COMMAND_INDEX[command.name] = command
+    for alias in command.aliases:
+        CONTROL_ROOM_COMMAND_INDEX[alias] = command
