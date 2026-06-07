@@ -2,7 +2,7 @@
 
 _This is the maintained status document for the repo. Update it at the end of each session when project understanding, port status, or next steps change. Keep it current over time rather than treating it as a frozen checkpoint._
 
-Last updated: 2026-06-07 (session 25)
+Last updated: 2026-06-07 (session 26)
 
 ## Where We Are
 
@@ -66,6 +66,7 @@ The important caveat is that the real autopilot loop is still largely unported. 
 | Refuel sequencing | Deferred | Legacy behavior is understood, but implementation is intentionally paused for now |
 | Dock sequencing | Done | `edap/routines/` — waits on journal events, boosts after SCX and settles, drives legacy-style docking request UI walk (three `ui_left` presses after panel navigation to reset contacts cursor, then `ui_right` + `ui_select`; `ui_left` to exit contacts menu after), retries after DockingDenied with configurable delay, optionally chains station refuel menu |
 | Undock sequencing | Done | `edap/routines/` — menu walk (UI_Back x10, HeadLookReset, UI_Down, UI_Select), polls for `Undocked` event (timeout 30s); live-validated. In-space confirmation step was reverted. |
+| Status.json reader | Done | `edap/status.py` — `StatusFlags.from_int()` decodes all 32 Flags bits into named boolean fields; `ShipStatus` holds flags, pips, fuel, cargo, legal state, and balance; `read_status(journal_dir)` returns a `ShipStatus` or `None`. Not yet wired into any routine or the control room. |
 | Station / docked state detection | Partial | `edap/state.py` derives coarse statuses like `in_station`, `starting_docking`, and `in_docking`, but there is no dedicated docked/station snapshot model yet |
 | Hotkey registration | Parked | `keyboard` lib doesn't work on macOS; likely future direction is a menu-bar app |
 | Legacy autopilot loop migration | Not ported | `dev_autopilot.py` remains the behavior reference; new `edap/` routines are still minimal |
