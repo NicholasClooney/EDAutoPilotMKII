@@ -179,6 +179,8 @@ def _market_trade(
         if delay > 0:
             sleeper(delay)
 
+    sleeper(5.0)
+
     # Verify Market.json matches the current docked station.
     # The game writes it when the market screen opens; retry up to 3 times if delayed.
     data: dict = {}
