@@ -14,6 +14,10 @@ class RoutineCancelled(Exception):
     """Raised when a control-room routine worker is cancelled."""
 
 
+class PendingRoutineCancelled(RoutineCancelled):
+    """Raised when a delayed command is cancelled before execution begins."""
+
+
 class CancellationProxy:
     def __init__(self, target: Any, check_cancelled: Callable[[], None]) -> None:
         self._target = target
@@ -32,6 +36,7 @@ class CancellationProxy:
 
 
 class WorkerHost(Protocol):
+    _config: Any
     _controls: Any
     _journal_dir: Any
     _verbose_controls: bool
@@ -45,6 +50,8 @@ class WorkerHost(Protocol):
     def _load_market_json(self) -> None: ...
     def _refresh_haul_stats(self) -> None: ...
     def _stop_haul_stats(self) -> None: ...
+    def _make_sleeper(self) -> Callable[[float], None]: ...
+    def _run_in_thread(self, fn: Callable[[], Any]) -> Any: ...
     def _finalize_shutdown(self) -> None: ...
     def call_from_thread(self, callback: Callable[..., Any], *args: Any) -> None: ...
 
@@ -113,6 +120,38 @@ def make_sleeper() -> Callable[[float], None]:
     return sleeper
 
 
+def start_delayed_routine(
+    app: WorkerHost,
+    *,
+    description: str,
+    start_message: str,
+    fn: Callable[[], Any],
+    active_routine_name: str | None = None,
+    on_start: Callable[[], None] | None = None,
+) -> None:
+    delay_s = app._config.control_room.command_delay_seconds
+
+    def run_with_optional_delay() -> Any:
+        if delay_s > 0:
+            try:
+                app._make_sleeper()(delay_s)
+            except RoutineCancelled as exc:
+                raise PendingRoutineCancelled(
+                    f"Cancelled pending {description} before execution."
+                ) from exc
+        if on_start is None:
+            app.call_from_thread(app._log, start_message)
+        else:
+            app.call_from_thread(on_start)
+        return fn()
+
+    app._routine_active = True
+    app._active_routine_name = active_routine_name
+    if delay_s > 0:
+        app._log(f"[dim]Executing {escape(description)} in {delay_s:.1f}s...[/]")
+    app._routine_worker = app._run_in_thread(run_with_optional_delay)
+
+
 def run_routine_thread(
     app: WorkerHost,
     fn: Callable[[], Any],
@@ -129,6 +168,8 @@ def run_routine_thread(
                 app._log,
                 f"[{color}]Done: {escape(result.action)} ({escape(status)})[/]",
             )
+    except PendingRoutineCancelled as exc:
+        app.call_from_thread(app._log, f"[yellow]{escape(str(exc))}[/]")
     except RoutineCancelled:
         app.call_from_thread(app._log, "[yellow]Routine cancelled.[/]")
     except Exception as exc:

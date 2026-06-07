@@ -70,22 +70,24 @@ def cmd_buy(app: TradeHost, rest: str) -> None:
     market_path = app._market_path
     watcher = app._make_watcher()
 
-    app._routine_active = True
     amt_label = str(amount) + ("t" if isinstance(amount, int) else "")
-    app._log(f"Buying {amt_label} [cyan]{escape(target)}[/]...")
     max_attempts = app._config.controls.market_trade_max_attempts
-    app._routine_worker = app._run_in_thread(lambda: market_buy(
-        controls,
-        watcher,
-        market_path=market_path,
-        target=target,
-        amount=amount,
-        step_delay_s=step_delay,
-        nav_delay_s=nav_delay,
-        max_attempts=max_attempts,
-        sleeper=sleeper,
-        progress_fn=progress,
-    ))
+    app._start_delayed_routine(
+        description=f"buy {target}",
+        start_message=f"Buying {amt_label} [cyan]{escape(target)}[/]...",
+        fn=lambda: market_buy(
+            controls,
+            watcher,
+            market_path=market_path,
+            target=target,
+            amount=amount,
+            step_delay_s=step_delay,
+            nav_delay_s=nav_delay,
+            max_attempts=max_attempts,
+            sleeper=sleeper,
+            progress_fn=progress,
+        ),
+    )
 
 
 def cmd_sell(app: TradeHost, rest: str) -> None:
@@ -124,21 +126,23 @@ def sell_item(app: TradeHost, target: str, amount: int | str) -> None:
     market_path = app._market_path
     watcher = app._make_watcher()
 
-    app._routine_active = True
     amt_label = str(amount) + ("t" if isinstance(amount, int) else "")
-    app._log(f"Selling {amt_label} [cyan]{escape(target)}[/]...")
     max_attempts = app._config.controls.market_trade_max_attempts
-    app._routine_worker = app._run_in_thread(lambda: market_sell(
-        controls, watcher,
-        market_path=market_path,
-        target=target,
-        amount=amount,
-        step_delay_s=step_delay,
-        nav_delay_s=nav_delay,
-        max_attempts=max_attempts,
-        sleeper=sleeper,
-        progress_fn=progress,
-    ))
+    app._start_delayed_routine(
+        description=f"sell {target}",
+        start_message=f"Selling {amt_label} [cyan]{escape(target)}[/]...",
+        fn=lambda: market_sell(
+            controls, watcher,
+            market_path=market_path,
+            target=target,
+            amount=amount,
+            step_delay_s=step_delay,
+            nav_delay_s=nav_delay,
+            max_attempts=max_attempts,
+            sleeper=sleeper,
+            progress_fn=progress,
+        ),
+    )
 
 
 def sell_all(app: TradeHost) -> None:
@@ -162,8 +166,6 @@ def sell_all(app: TradeHost) -> None:
     names = ", ".join(item.get("Name_Localised") or item.get("Name", "?") for item in inventory)
     if used_fallback:
         app._log("[yellow]Cargo journal state was empty; using Cargo.json fallback for sell-all[/]")
-    app._log(f"Selling all cargo: [cyan]{escape(names)}[/]")
-    app._routine_active = True
     max_attempts = app._config.controls.market_trade_max_attempts
 
     def run_all() -> None:
@@ -192,4 +194,8 @@ def sell_all(app: TradeHost) -> None:
                 )
         app.call_from_thread(app._log, "[green]Sell-all complete[/]")
 
-    app._routine_worker = app._run_in_thread(run_all)
+    app._start_delayed_routine(
+        description="sell all cargo",
+        start_message=f"Selling all cargo: [cyan]{escape(names)}[/]",
+        fn=run_all,
+    )

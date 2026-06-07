@@ -47,6 +47,7 @@ class LoadConfigTests(unittest.TestCase):
             self.assertEqual(config.runtime.platform, "macos")
             self.assertEqual(config.control_room.state_file, Path(".control_room_state.json"))
             self.assertEqual(config.control_room.history_limit, 20)
+            self.assertEqual(config.control_room.command_delay_seconds, 5.0)
 
     def test_rejects_non_positive_continuous_hold_setting(self) -> None:
         with TemporaryDirectory() as temp_dir:
@@ -107,6 +108,28 @@ continuous_action_hold_seconds = 0.1
             )
 
             with self.assertRaisesRegex(ConfigError, "continuous_action_hold_seconds"):
+                load_config(config_path)
+
+    def test_rejects_negative_control_room_command_delay(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "config.toml"
+            _write_config(
+                config_path,
+                """
+[paths]
+
+[controls]
+
+[screen]
+
+[runtime]
+
+[control_room]
+command_delay_seconds = -0.1
+""".strip(),
+            )
+
+            with self.assertRaisesRegex(ConfigError, "control_room.command_delay_seconds"):
                 load_config(config_path)
 
     def test_loads_capture_region_overrides(self) -> None:

@@ -70,6 +70,7 @@ class RuntimeConfig:
 class ControlRoomConfig:
     state_file: Path
     history_limit: int
+    command_delay_seconds: float
 
 
 @dataclass(frozen=True)
@@ -218,6 +219,8 @@ def validate_config(config: AppConfig) -> AppConfig:
         )
     if config.control_room.history_limit <= 0:
         raise ConfigError("Config value `control_room.history_limit` must be greater than 0.")
+    if config.control_room.command_delay_seconds < 0:
+        raise ConfigError("Config value `control_room.command_delay_seconds` must be non-negative.")
 
     _validate_path_shape(config.paths.journal_dir, key="paths.journal_dir", should_be_dir=True)
     _validate_path_shape(config.paths.bindings_file, key="paths.bindings_file", should_be_dir=False)
@@ -317,6 +320,7 @@ def load_config(path: Path | str = DEFAULT_CONFIG_PATH) -> AppConfig:
         control_room=ControlRoomConfig(
             state_file=Path(_string(control_room, "state_file", ".control_room_state.json")).expanduser(),
             history_limit=_integer(control_room, "history_limit", 20),
+            command_delay_seconds=_float(control_room, "command_delay_seconds", 5.0),
         ),
     )
     return validate_config(config)

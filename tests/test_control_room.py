@@ -28,6 +28,7 @@ from edap.control_room.models import ShipState
 from edap.control_room_state import CommandHistoryEntry
 from edap.routines import RoutineResult
 from edap.runtime import ResolvedPath, RuntimeContext
+from edap.control_room.workers import PendingRoutineCancelled, RoutineCancelled
 
 
 def _make_config(journal_dir: Path) -> AppConfig:
@@ -64,6 +65,7 @@ def _make_config(journal_dir: Path) -> AppConfig:
         control_room=ControlRoomConfig(
             state_file=journal_dir / ".control_room_state.json",
             history_limit=20,
+            command_delay_seconds=0.0,
         ),
     )
 
@@ -102,6 +104,9 @@ class _HarnessApp(ControlRoomApp):
     def _log(self, msg: str) -> None:
         self.logged.append(msg)
 
+    def call_from_thread(self, callback, *args, **kwargs):  # type: ignore[override]
+        return callback(*args, **kwargs)
+
     def exit(self, result=None, return_code: int = 0, message=None) -> None:
         self.exit_calls += 1
 
@@ -128,6 +133,8 @@ class _HarnessApp(ControlRoomApp):
 class _InputStub:
     def __init__(self) -> None:
         self.placeholder = ""
+        self.value = ""
+        self.cursor_position = 0
 
 
 class ControlRoomCommandTests(unittest.TestCase):
@@ -480,6 +487,7 @@ class ControlRoomBindingsTests(unittest.TestCase):
             control_room=ControlRoomConfig(
                 state_file=self.app._config.control_room.state_file,
                 history_limit=2,
+                command_delay_seconds=self.app._config.control_room.command_delay_seconds,
             ),
         )
 
@@ -676,6 +684,167 @@ class ControlRoomDispatchTests(unittest.TestCase):
         entry = self._last_history()
         self.assertEqual(entry.command, "market")
         self.assertEqual(entry.params, {"value": "filter Aluminium"})
+
+    def test_typed_executable_command_waits_before_launch(self) -> None:
+        delays: list[float] = []
+        called: list[str] = []
+
+        self.app._controls = object()
+        self.app._config = self.app._config.__class__(
+            paths=self.app._config.paths,
+            controls=self.app._config.controls,
+            screen=self.app._config.screen,
+            runtime=self.app._config.runtime,
+            control_room=ControlRoomConfig(
+                state_file=self.app._config.control_room.state_file,
+                history_limit=self.app._config.control_room.history_limit,
+                command_delay_seconds=5.0,
+            ),
+        )
+        self.app._make_progress = lambda: (lambda _: None)
+        self.app._make_controls = lambda progress: object()
+        self.app._make_watcher = lambda: object()
+        self.app._make_sleeper = lambda: (lambda delay: delays.append(delay))
+        self.app._run_in_thread = lambda fn: fn()
+
+        def fake_jump(controls, watcher, **kwargs):
+            called.append("jump")
+            return None
+
+        with patch("edap.control_room.routines_movement.jump", new=fake_jump):
+            self.app._dispatch_command("jump")
+
+        self.assertEqual(delays, [5.0])
+        self.assertEqual(called, ["jump"])
+        self.assertIn("Executing jump in 5.0s...", "\n".join(self.app.logged))
+        self.assertIn("Starting jump sequence...", "\n".join(self.app.logged))
+
+    def test_replay_execute_uses_same_command_delay(self) -> None:
+        delays: list[float] = []
+        called: list[str] = []
+
+        self.app._controls = object()
+        self.app._config = self.app._config.__class__(
+            paths=self.app._config.paths,
+            controls=self.app._config.controls,
+            screen=self.app._config.screen,
+            runtime=self.app._config.runtime,
+            control_room=ControlRoomConfig(
+                state_file=self.app._config.control_room.state_file,
+                history_limit=self.app._config.control_room.history_limit,
+                command_delay_seconds=5.0,
+            ),
+        )
+        self.app._make_progress = lambda: (lambda _: None)
+        self.app._make_controls = lambda progress: object()
+        self.app._make_watcher = lambda: object()
+        self.app._make_sleeper = lambda: (lambda delay: delays.append(delay))
+        self.app._run_in_thread = lambda fn: fn()
+
+        def fake_jump(controls, watcher, **kwargs):
+            called.append("jump")
+            return None
+
+        with patch("edap.control_room.routines_movement.jump", new=fake_jump):
+            self.app._replay_history_entry(
+                CommandHistoryEntry(raw="jump", command="jump", timestamp="1"),
+                edit=False,
+            )
+
+        self.assertEqual(delays, [5.0])
+        self.assertEqual(called, ["jump"])
+
+    def test_replay_edit_stays_immediate(self) -> None:
+        delays: list[float] = []
+        input_stub = _InputStub()
+        focused: list[object] = []
+
+        self.app._config = self.app._config.__class__(
+            paths=self.app._config.paths,
+            controls=self.app._config.controls,
+            screen=self.app._config.screen,
+            runtime=self.app._config.runtime,
+            control_room=ControlRoomConfig(
+                state_file=self.app._config.control_room.state_file,
+                history_limit=self.app._config.control_room.history_limit,
+                command_delay_seconds=5.0,
+            ),
+        )
+        self.app._make_sleeper = lambda: (lambda delay: delays.append(delay))
+        self.app.query_one = lambda *args, **kwargs: input_stub  # type: ignore[method-assign]
+        self.app.set_focus = lambda widget: focused.append(widget)  # type: ignore[method-assign]
+
+        self.app._replay_history_entry(
+            CommandHistoryEntry(raw="jump", command="jump", timestamp="1"),
+            edit=True,
+        )
+
+        self.assertEqual(delays, [])
+        self.assertEqual(input_stub.value, "jump")
+        self.assertEqual(input_stub.cursor_position, 4)
+        self.assertEqual(focused, [input_stub])
+
+    def test_non_executable_command_stays_immediate_even_with_delay_configured(self) -> None:
+        delays: list[float] = []
+
+        self.app._config = self.app._config.__class__(
+            paths=self.app._config.paths,
+            controls=self.app._config.controls,
+            screen=self.app._config.screen,
+            runtime=self.app._config.runtime,
+            control_room=ControlRoomConfig(
+                state_file=self.app._config.control_room.state_file,
+                history_limit=self.app._config.control_room.history_limit,
+                command_delay_seconds=5.0,
+            ),
+        )
+        self.app._make_sleeper = lambda: (lambda delay: delays.append(delay))
+
+        self.app._dispatch_command("help dock")
+
+        self.assertEqual(delays, [])
+        self.assertIn("dock", "\n".join(self.app.logged))
+
+    def test_cancellation_during_pending_delay_prevents_launch(self) -> None:
+        called: list[str] = []
+
+        self.app._controls = object()
+        self.app._config = self.app._config.__class__(
+            paths=self.app._config.paths,
+            controls=self.app._config.controls,
+            screen=self.app._config.screen,
+            runtime=self.app._config.runtime,
+            control_room=ControlRoomConfig(
+                state_file=self.app._config.control_room.state_file,
+                history_limit=self.app._config.control_room.history_limit,
+                command_delay_seconds=5.0,
+            ),
+        )
+        self.app._make_progress = lambda: (lambda _: None)
+        self.app._make_controls = lambda progress: object()
+        self.app._make_watcher = lambda: object()
+        self.app._make_sleeper = lambda: (lambda delay: (_ for _ in ()).throw(RoutineCancelled()))
+
+        def fake_run_in_thread(fn):
+            try:
+                return fn()
+            except PendingRoutineCancelled as exc:
+                self.app._log(f"[yellow]{exc}[/]")
+                self.app._clear_routine()
+                return None
+
+        self.app._run_in_thread = fake_run_in_thread
+
+        def fake_jump(controls, watcher, **kwargs):
+            called.append("jump")
+            return None
+
+        with patch("edap.control_room.routines_movement.jump", new=fake_jump):
+            self.app._dispatch_command("jump")
+
+        self.assertEqual(called, [])
+        self.assertFalse(self.app._routine_active)
+        self.assertIn("Cancelled pending jump before execution.", "\n".join(self.app.logged))
 
 
 class ControlRoomEventReducerTests(unittest.TestCase):

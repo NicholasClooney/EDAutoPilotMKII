@@ -33,17 +33,19 @@ def dispatch_dest(app: NavigationHost, destination: str, galaxy_map_settle: floa
         },
         timestamp=now_iso(),
     ))
-    app._routine_active = True
-    app._log(
-        f"Setting galaxy map destination: [bold]{escape(destination)}[/] "
-        f"[dim](settle {galaxy_map_settle:.1f}s)[/]"
+    app._start_delayed_routine(
+        description=f"dest {destination}",
+        start_message=(
+            f"Setting galaxy map destination: [bold]{escape(destination)}[/] "
+            f"[dim](settle {galaxy_map_settle:.1f}s)[/]"
+        ),
+        fn=lambda: set_gal_map_destination(
+            controls,
+            destination=destination,
+            journal_dir=journal_dir,
+            step_delay_s=step_delay,
+            map_settle_s=galaxy_map_settle,
+            sleeper=sleeper,
+            progress_fn=progress,
+        ),
     )
-    app._routine_worker = app._run_in_thread(lambda: set_gal_map_destination(
-        controls,
-        destination=destination,
-        journal_dir=journal_dir,
-        step_delay_s=step_delay,
-        map_settle_s=galaxy_map_settle,
-        sleeper=sleeper,
-        progress_fn=progress,
-    ))

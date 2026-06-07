@@ -14,18 +14,20 @@ def cmd_dock(app: RoutineHost) -> None:
     step_delay = app._config.controls.step_delay_seconds
     watcher = app._make_watcher()
 
-    app._routine_active = True
     label = "dock (already in space)" if skip_scx else "dock (waiting for supercruise exit)"
-    app._log(f"Starting {label}, auto-refuel on...")
-    app._routine_worker = app._run_in_thread(lambda: dock(
-        controls,
-        watcher,
-        wait_for_supercruise_exit=not skip_scx,
-        auto_refuel=True,
-        step_delay_s=step_delay,
-        sleeper=sleeper,
-        progress_fn=progress,
-    ))
+    app._start_delayed_routine(
+        description=label,
+        start_message=f"Starting {label}, auto-refuel on...",
+        fn=lambda: dock(
+            controls,
+            watcher,
+            wait_for_supercruise_exit=not skip_scx,
+            auto_refuel=True,
+            step_delay_s=step_delay,
+            sleeper=sleeper,
+            progress_fn=progress,
+        ),
+    )
 
 
 def cmd_undock(app: RoutineHost) -> None:
@@ -39,14 +41,16 @@ def cmd_undock(app: RoutineHost) -> None:
     no_track_timeout = app._config.controls.undock_no_track_timeout_seconds
     watcher = app._make_watcher()
 
-    app._routine_active = True
-    app._log("Starting undock...")
-    app._routine_worker = app._run_in_thread(lambda: undock(
-        controls,
-        watcher,
-        undock_timeout_s=undock_timeout,
-        no_track_timeout_s=no_track_timeout,
-        step_delay_s=step_delay,
-        sleeper=sleeper,
-        progress_fn=progress,
-    ))
+    app._start_delayed_routine(
+        description="undock",
+        start_message="Starting undock...",
+        fn=lambda: undock(
+            controls,
+            watcher,
+            undock_timeout_s=undock_timeout,
+            no_track_timeout_s=no_track_timeout,
+            step_delay_s=step_delay,
+            sleeper=sleeper,
+            progress_fn=progress,
+        ),
+    )

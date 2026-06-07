@@ -80,6 +80,24 @@ class ControlRoomFacade:
     def make_sleeper(self) -> Callable[[float], None]:
         return _workers.make_sleeper()
 
+    def start_delayed_routine(
+        self,
+        *,
+        description: str,
+        start_message: str,
+        fn: Callable[[], Any],
+        active_routine_name: str | None = None,
+        on_start: Callable[[], None] | None = None,
+    ) -> None:
+        _workers.start_delayed_routine(
+            self._app,
+            description=description,
+            start_message=start_message,
+            fn=fn,
+            active_routine_name=active_routine_name,
+            on_start=on_start,
+        )
+
     def raise_if_worker_cancelled(self) -> None:
         _workers.raise_if_worker_cancelled()
 
@@ -192,6 +210,7 @@ FACADE_METHOD_MAP = {
     "_make_controls": "make_controls",
     "_make_watcher": "make_watcher",
     "_make_sleeper": "make_sleeper",
+    "_start_delayed_routine": "start_delayed_routine",
     "_raise_if_worker_cancelled": "raise_if_worker_cancelled",
     "_cmd_dock": "cmd_dock",
     "_cmd_undock": "cmd_undock",
