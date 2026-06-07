@@ -1433,13 +1433,13 @@ class ControlRoomApp(App[None]):
             self.action_request_quit()
             return
         if self._resume_open:
-            if event.key in {"escape", "q"}:
+            if event.key == "escape" or (event.key == "q" and not self._resume_filter):
                 event.prevent_default()
                 self._close_resume_picker()
-            elif event.key == "e":
+            elif event.key == "e" and not self._resume_filter:
                 event.prevent_default()
                 self._resume_edit_selected()
-            elif event.key == "*":
+            elif event.character == "*":
                 event.prevent_default()
                 self._resume_toggle_default_selected()
             elif event.key == "enter":
