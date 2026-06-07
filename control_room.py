@@ -60,6 +60,10 @@ from edap.control_room.history import (
     resume_summary as _resume_summary,
 )
 from edap.control_room.models import MarketData, ReplaySelection, ShipState
+from edap.control_room.routines_nav import (
+    cmd_dest as _cmd_dest_impl,
+    dispatch_dest as _dispatch_dest_impl,
+)
 from edap.control_room.routines_movement import (
     cmd_boost as _cmd_boost_impl,
     cmd_escape as _cmd_escape_impl,
@@ -76,7 +80,7 @@ from edap.control_room_state import (
     save_control_room_state,
 )
 from edap.progress_controls import ProgressShipControls
-from edap.routines import haul_loop, market_buy, market_sell, set_gal_map_destination
+from edap.routines import haul_loop, market_buy, market_sell
 from edap.runtime import RuntimeContext, build_runtime_context, load_config_with_fallback
 from edap.ship_controls import DEFAULT_SHIP_CONTROL_ACTIONS, ShipControls
 from edap.state import JournalWatcher, get_latest_journal_log, read_ship_state
@@ -854,43 +858,10 @@ class ControlRoomApp(App[None]):
         )
 
     def _cmd_dest(self, destination: str) -> None:
-        if not self._check_routine_ready():
-            return
-        if not destination:
-            self._log("[red]Usage: dest <system name>[/]")
-            return
-        self._start_dest_prompt(destination)
+        _cmd_dest_impl(self, destination)
 
     def _dispatch_dest(self, destination: str, galaxy_map_settle: float) -> None:
-        progress = self._make_progress()
-        controls = self._make_controls(progress)
-        sleeper = self._make_sleeper()
-        step_delay = self._config.controls.step_delay_seconds
-        journal_dir = self._journal_dir
-
-        self._record_history_entry(CommandHistoryEntry(
-            raw=f"dest {destination}",
-            command="dest",
-            params={
-                "destination": destination,
-                "galaxy_map_settle": galaxy_map_settle,
-            },
-            timestamp=_now_iso(),
-        ))
-        self._routine_active = True
-        self._log(
-            f"Setting galaxy map destination: [bold]{escape(destination)}[/] "
-            f"[dim](settle {galaxy_map_settle:.1f}s)[/]"
-        )
-        self._routine_worker = self._run_in_thread(lambda: set_gal_map_destination(
-            controls,
-            destination=destination,
-            journal_dir=journal_dir,
-            step_delay_s=step_delay,
-            map_settle_s=galaxy_map_settle,
-            sleeper=sleeper,
-            progress_fn=progress,
-        ))
+        _dispatch_dest_impl(self, destination, galaxy_map_settle)
 
     def _saved_haul_defaults(self, seed: dict[str, str] | None = None) -> dict[str, str]:
         defaults = dict(self._saved_state.default_haul)
