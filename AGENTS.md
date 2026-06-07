@@ -25,9 +25,10 @@ See [docs/STATUS.md](docs/STATUS.md) for the current port status, what is stubbe
 
 ## Testing
 
-- Use `python -m unittest` to run tests, not pytest.
-- Run a single file: `python -m unittest tests/test_foo.py`
-- Run all tests: `python -m unittest discover -s tests`
+- Use `uv run python3 -m unittest` to run tests, not pytest.
+- Run a single file: `uv run python3 -m unittest tests/test_foo.py`
+- Run all tests: `uv run python3 -m unittest discover -s tests`
+- Do not use the bare system interpreter for test runs; the repo's `uv` environment is the required test entrypoint.
 
 ## Working Rules
 

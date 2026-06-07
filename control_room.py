@@ -258,6 +258,26 @@ def _parse_amount(s: str) -> int | str | None:
         return n if n > 0 else None
     except ValueError:
         return None
+
+
+def _read_cargo_inventory(journal_dir: Path) -> list[dict[str, Any]]:
+    cargo_path = journal_dir / "Cargo.json"
+    try:
+        with cargo_path.open() as fh:
+            data = json.load(fh)
+        inventory = data.get("Inventory", [])
+        return inventory if isinstance(inventory, list) else []
+    except (OSError, json.JSONDecodeError):
+        return []
+
+
+def _sellable_cargo(inventory: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [
+        item for item in inventory
+        if item.get("Count", 0) > 0
+        and item.get("Stolen", 0) == 0
+        and "MissionID" not in item
+    ]
 # ── App ────────────────────────────────────────────────────────────────────────
 
 
@@ -849,13 +869,11 @@ class ControlRoomApp(App[None]):
         ))
 
     def _sell_all(self) -> None:
-        # Build a sellable snapshot from cargo: skip mission cargo and stolen items.
-        inventory = [
-            item for item in self._ship.cargo_inventory
-            if item.get("Count", 0) > 0
-            and item.get("Stolen", 0) == 0
-            and "MissionID" not in item
-        ]
+        inventory = _sellable_cargo(self._ship.cargo_inventory)
+        used_fallback = False
+        if not inventory:
+            inventory = _sellable_cargo(_read_cargo_inventory(self._journal_dir))
+            used_fallback = bool(inventory)
         if not inventory:
             self._log("[yellow]Nothing sellable in cargo (empty, all stolen, or all mission cargo)[/]")
             return
@@ -868,6 +886,8 @@ class ControlRoomApp(App[None]):
         watcher = self._make_watcher()
 
         names = ", ".join(item.get("Name_Localised") or item.get("Name", "?") for item in inventory)
+        if used_fallback:
+            self._log("[yellow]Cargo journal state was empty; using Cargo.json fallback for sell-all[/]")
         self._log(f"Selling all cargo: [cyan]{escape(names)}[/]")
         self._routine_active = True
 

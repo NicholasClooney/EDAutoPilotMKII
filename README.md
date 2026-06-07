@@ -227,7 +227,7 @@ If you press `Ctrl-C` or `Ctrl-D` while a routine is active, control room now ca
 | `help [command]` | Explain one command in plain English, including what it tries to do. |
 | `q` / `quit` / `exit` | Cancel active work if needed, then exit control room cleanly. |
 
-Cargo state comes from `Cargo` journal events (written by the game on load and after each trade). If the game hasn't written a `Cargo` event since startup, `sell` (no args) will report an empty manifest; use `sell <item>` with an explicit commodity name as the fallback.
+Cargo state in the status pane still comes from `Cargo` journal events (written by the game on load and after each trade). For control-room `sell` with no item, if the live journal-backed cargo manifest is empty, control room now falls back to `Cargo.json` before reporting an empty hold.
 
 ### `scratch_market.py`
 
@@ -255,7 +255,7 @@ This project is still experimental. Do not leave it running unattended.
 Run the lightweight verification harness with:
 
 ```sh
-python3 -m unittest discover -s tests -p 'test_*.py'
+uv run python3 -m unittest discover -s tests -p 'test_*.py'
 ```
 
 For commits, use Conventional Commits.

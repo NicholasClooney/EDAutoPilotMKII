@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
 from control_room import ControlRoomApp
+from edap.actions import ActionDispatchResult
 from edap.config import (
     AppConfig,
     CaptureConfig,
@@ -15,6 +17,7 @@ from edap.config import (
     RuntimeConfig,
     ScreenConfig,
 )
+from edap.routines import RoutineResult
 from edap.runtime import ResolvedPath, RuntimeContext
 
 
@@ -144,6 +147,7 @@ class ControlRoomCommandTests(unittest.TestCase):
     def test_undock_command_uses_configured_timeouts(self) -> None:
         captured: dict[str, object] = {}
 
+        self.app._controls = object()
         self.app._make_progress = lambda: (lambda _: None)
         self.app._make_controls = lambda progress: object()
         self.app._make_sleeper = lambda: (lambda _: None)
@@ -162,6 +166,40 @@ class ControlRoomCommandTests(unittest.TestCase):
         self.assertEqual(captured["kwargs"]["undock_timeout_s"], 30.0)
         self.assertEqual(captured["kwargs"]["in_space_timeout_s"], 180.0)
         self.assertEqual(captured["kwargs"]["step_delay_s"], 0.3)
+
+    def test_sell_all_falls_back_to_cargo_json_when_live_manifest_is_empty(self) -> None:
+        cargo_path = Path(self.tmpdir.name) / "Cargo.json"
+        cargo_path.write_text(json.dumps({
+            "Inventory": [
+                {"Name": "aluminium", "Name_Localised": "Aluminium", "Count": 12, "Stolen": 0},
+            ]
+        }))
+
+        captured_targets: list[str] = []
+        self.app._controls = object()
+        self.app._make_progress = lambda: (lambda _: None)
+        self.app._make_controls = lambda progress: object()
+        self.app._make_sleeper = lambda: (lambda _: None)
+        self.app._make_watcher = lambda: object()
+        self.app._run_in_thread = lambda fn: fn()
+        self.app._raise_if_worker_cancelled = lambda: None
+        self.app.call_from_thread = lambda fn, *args, **kwargs: fn(*args, **kwargs)
+
+        def fake_market_sell(controls, watcher, **kwargs):
+            captured_targets.append(kwargs["target"])
+            return RoutineResult(
+                action="market_sell",
+                dispatch=ActionDispatchResult(action="market_sell", status="ok"),
+            )
+
+        with patch("control_room.market_sell", new=fake_market_sell):
+            self.app._sell_all()
+
+        output = "\n".join(self.app.logged)
+        self.assertEqual(captured_targets, ["Aluminium"])
+        self.assertIn("Cargo.json fallback", output)
+        self.assertIn("Sell-all complete", output)
+        self.assertNotIn("Nothing sellable in cargo", output)
 
 
 if __name__ == "__main__":
