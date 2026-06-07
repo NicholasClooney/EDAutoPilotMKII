@@ -1,6 +1,7 @@
 from edap.routines._base import (
     RoutineResult,
     SupportsDockingControls,
+    SupportsEscapeControls,
     SupportsGalaxyMapControls,
     SupportsHaulControls,
     SupportsJumpControls,
@@ -10,6 +11,7 @@ from edap.routines._base import (
     SupportsStationMenuControls,
     SupportsUndockControls,
 )
+from edap.routines.escape import escape_mass_lock
 from edap.routines.docking import (
     dock,
     docking_request_sequence,
@@ -26,6 +28,7 @@ from edap.routines.throttle import auto_zero_throttle_on_arrival, set_speed_zero
 __all__ = [
     "RoutineResult",
     "SupportsDockingControls",
+    "SupportsEscapeControls",
     "SupportsGalaxyMapControls",
     "SupportsHaulControls",
     "SupportsJumpControls",
@@ -36,6 +39,7 @@ __all__ = [
     "SupportsUndockControls",
     "auto_zero_throttle_on_arrival",
     "dock",
+    "escape_mass_lock",
     "docking_request_sequence",
     "haul_loop",
     "jump",

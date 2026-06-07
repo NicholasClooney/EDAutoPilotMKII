@@ -87,6 +87,14 @@ class SupportsDockingControls(SupportsStationMenuControls, SupportsSetSpeedZero,
         """Dispatch the UI_Left action."""
 
 
+class SupportsEscapeControls(Protocol):
+    def boost(self, repeat: int = 1, hold_s: float = 0.0) -> ActionDispatchResult:
+        """Dispatch the BoostButton action."""
+
+    def set_speed_full(self, repeat: int = 1, hold_s: float = 0.0) -> ActionDispatchResult:
+        """Dispatch the SetSpeed100 action."""
+
+
 class SupportsGalaxyMapControls(Protocol):
     def galaxy_map_open(self, repeat: int = 1, hold_s: float = 0.0) -> ActionDispatchResult:
         """Dispatch the GalaxyMapOpen action."""

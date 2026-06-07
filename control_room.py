@@ -57,7 +57,7 @@ from edap.control_room_state import (
     save_control_room_state,
 )
 from edap.progress_controls import ProgressShipControls
-from edap.routines import dock, haul_loop, jump, market_buy, market_sell, set_gal_map_destination, undock, RoutineResult
+from edap.routines import dock, escape_mass_lock, haul_loop, jump, market_buy, market_sell, set_gal_map_destination, undock, RoutineResult
 from edap.runtime import RuntimeContext, build_runtime_context, load_config_with_fallback
 from edap.ship_controls import ShipControls
 from edap.state import JournalWatcher, get_latest_journal_log, read_ship_state
@@ -76,7 +76,7 @@ _ALL_ROUTINE_ACTIONS = [
     "GalaxyMapOpen", "CamZoomIn",
 ]
 
-_DEFAULT_COMMAND_PLACEHOLDER = "commands | help dock | replay | dock | undock | buy <item> [N] | sell [item] | haul [commodity] | dest <system> | market ... | q"
+_DEFAULT_COMMAND_PLACEHOLDER = "commands | help dock | replay | dock | undock | escape | jump | buy <item> [N] | sell [item] | haul [commodity] | dest <system> | market ... | q"
 
 
 class _RoutineCancelled(Exception):
@@ -874,6 +874,27 @@ class ControlRoomApp(App[None]):
             progress_fn=progress,
         ))
 
+    def _cmd_escape(self) -> None:
+        if not self._check_routine_ready():
+            return
+        progress = self._make_progress()
+        controls = self._make_controls(progress)
+        sleeper = self._make_sleeper()
+        journal_dir = self._journal_dir
+        boost_delay = self._config.controls.mass_lock_boost_delay_seconds
+        step_delay = self._config.controls.step_delay_seconds
+
+        self._routine_active = True
+        self._log("Starting escape mass lock...")
+        self._routine_worker = self._run_in_thread(lambda: escape_mass_lock(
+            controls,
+            journal_dir=journal_dir,
+            boost_delay_s=boost_delay,
+            step_delay_s=step_delay,
+            sleeper=sleeper,
+            progress_fn=progress,
+        ))
+
     def _start_dest_prompt(self, destination: str, *, settle_default: float | None = None) -> None:
         self._dest_prompt_destination = destination
         self._dest_prompt_settle_default = settle_default if settle_default is not None else self._config.controls.galaxy_map_settle_seconds
@@ -1450,6 +1471,9 @@ class ControlRoomApp(App[None]):
         elif verb == "jump":
             self._record_history_entry(CommandHistoryEntry(raw=raw, command="jump", timestamp=_now_iso()))
             self._cmd_jump()
+        elif verb in {"escape", "boost"}:
+            self._record_history_entry(CommandHistoryEntry(raw=raw, command="escape", timestamp=_now_iso()))
+            self._cmd_escape()
         elif verb == "buy":
             self._cmd_buy(raw_rest)
         elif verb == "sell":

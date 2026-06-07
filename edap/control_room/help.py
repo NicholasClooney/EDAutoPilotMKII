@@ -23,6 +23,13 @@ CONTROL_ROOM_COMMANDS: list[CommandHelp] = [
         detail="Sends the hyperspace control, waits for the jump to start, waits to re-enter supercruise at the destination, then sets speed to zero.",
     ),
     CommandHelp(
+        name="escape",
+        usage="escape",
+        summary="Set speed full and boost away until the FSD mass-lock clears.",
+        detail="Sets throttle to 100%, then checks Status.json in a loop: if the FSD mass-locked flag is set, fires a boost and waits the configured boost delay before checking again. Stops and reports success once the flag clears or is absent.",
+        aliases=("boost",),
+    ),
+    CommandHelp(
         name="buy",
         usage="buy <item> [amount|max]",
         summary="Buy a commodity from the current station market.",

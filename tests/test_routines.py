@@ -12,6 +12,7 @@ from edap.routines import (
     auto_zero_throttle_on_arrival,
     dock,
     docking_request_sequence,
+    escape_mass_lock,
     jump,
     market_sell,
     set_gal_map_destination,
@@ -500,6 +501,90 @@ class RoutinesTests(unittest.TestCase):
             ],
         )
         self.assertGreaterEqual(sleep_calls.count(0.5), 3)
+
+
+class EscapeMassLockTests(unittest.TestCase):
+    def _write_status(self, journal_dir: Path, *, mass_locked: bool) -> None:
+        flags = (1 << 16) if mass_locked else 0
+        data = {"timestamp": "2024-01-01T00:00:00Z", "event": "Status", "Flags": flags}
+        (journal_dir / "Status.json").write_text(json.dumps(data), encoding="utf-8")
+
+    def test_not_mass_locked_returns_immediately_with_no_boosts(self) -> None:
+        controls = FakeShipControls()
+        sleep_calls: list[float] = []
+
+        with tempfile.TemporaryDirectory() as tmp:
+            journal_dir = Path(tmp)
+            self._write_status(journal_dir, mass_locked=False)
+
+            result = escape_mass_lock(
+                controls,
+                journal_dir=journal_dir,
+                boost_delay_s=5.0,
+                step_delay_s=0.3,
+                sleeper=sleep_calls.append,
+            )
+
+        self.assertIsInstance(result, RoutineResult)
+        self.assertEqual(result.action, "EscapeMassLock")
+        self.assertEqual(result.dispatch.status, "ok")
+        self.assertEqual(result.details["boost_count"], 0)
+        boost_calls = [c for c in controls.calls if c["action"] == "BoostButton"]
+        self.assertEqual(boost_calls, [])
+        self.assertEqual(sleep_calls, [0.3])
+
+    def test_boosts_until_mass_lock_clears(self) -> None:
+        controls = FakeShipControls()
+        boost_calls_seen: list[int] = []
+
+        with tempfile.TemporaryDirectory() as tmp:
+            journal_dir = Path(tmp)
+            self._write_status(journal_dir, mass_locked=True)
+
+            def sleeper(s: float) -> None:
+                if s == 5.0 and len(boost_calls_seen) == 0:
+                    boost_calls_seen.append(1)
+                    self._write_status(journal_dir, mass_locked=False)
+
+            result = escape_mass_lock(
+                controls,
+                journal_dir=journal_dir,
+                boost_delay_s=5.0,
+                step_delay_s=0.0,
+                sleeper=sleeper,
+            )
+
+        self.assertEqual(result.action, "EscapeMassLock")
+        self.assertEqual(result.dispatch.status, "ok")
+        self.assertEqual(result.details["boost_count"], 1)
+        boost_dispatches = [c for c in controls.calls if c["action"] == "BoostButton"]
+        self.assertEqual(len(boost_dispatches), 1)
+
+    def test_rejects_negative_boost_delay(self) -> None:
+        controls = FakeShipControls()
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaisesRegex(ValueError, "boost_delay_s"):
+                escape_mass_lock(controls, journal_dir=Path(tmp), boost_delay_s=-1.0)
+
+    def test_rejects_negative_step_delay(self) -> None:
+        controls = FakeShipControls()
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaisesRegex(ValueError, "step_delay_s"):
+                escape_mass_lock(controls, journal_dir=Path(tmp), step_delay_s=-0.1)
+
+    def test_missing_status_file_exits_immediately(self) -> None:
+        controls = FakeShipControls()
+        with tempfile.TemporaryDirectory() as tmp:
+            result = escape_mass_lock(
+                controls,
+                journal_dir=Path(tmp),
+                boost_delay_s=5.0,
+                step_delay_s=0.0,
+                sleeper=lambda _: None,
+            )
+        self.assertEqual(result.details["boost_count"], 0)
+        boost_calls = [c for c in controls.calls if c["action"] == "BoostButton"]
+        self.assertEqual(boost_calls, [])
 
 
 _OK = ActionDispatchResult(action="ok", status="ok", binding=NormalizedBinding(key="x", modifier=None))

@@ -7,9 +7,9 @@ from typing import Callable
 
 from edap.routines._base import RoutineResult, SupportsHaulControls, SupportsPollEvents
 from edap.routines.docking import dock, undock
+from edap.routines.escape import escape_mass_lock
 from edap.routines.galaxy_map import set_gal_map_destination
 from edap.routines.market import market_buy, market_sell
-from edap.status import read_status
 
 
 def _read_cargo_json(journal_dir: Path) -> list[dict]:
@@ -30,34 +30,6 @@ def _sellable_cargo(inventory: list[dict]) -> list[dict]:
         and "MissionID" not in item
     ]
 
-
-def _escape_mass_lock(
-    controls: SupportsHaulControls,
-    *,
-    journal_dir: Path,
-    step_delay_s: float,
-    mass_lock_boost_delay_s: float,
-    sleeper: Callable[[float], None],
-    progress_fn: Callable[[str], None] | None,
-) -> None:
-    if progress_fn is not None:
-        progress_fn("Setting speed 100 to break auto-undock...")
-    speed_result = controls.set_speed_full()
-    if speed_result.status != "ok" and progress_fn is not None:
-        progress_fn(f"Warning: SetSpeed100 dispatch failed: {speed_result.reason}")
-    if step_delay_s > 0:
-        sleeper(step_delay_s)
-
-    while True:
-        status = read_status(journal_dir)
-        if status is None or not status.flags.fsd_mass_locked:
-            break
-        if progress_fn is not None:
-            progress_fn("FSD mass locked -- boosting away...")
-        boost_result = controls.boost()
-        if boost_result.status != "ok" and progress_fn is not None:
-            progress_fn(f"Warning: BoostButton dispatch failed: {boost_result.reason}")
-        sleeper(mass_lock_boost_delay_s)
 
 
 def haul_loop(
@@ -165,11 +137,11 @@ def haul_loop(
                 map_settle_s=galaxy_map_settle_s,
                 progress_fn=progress_fn,
             )
-        _escape_mass_lock(
+        escape_mass_lock(
             controls,
             journal_dir=journal_dir,
             step_delay_s=step_delay_s,
-            mass_lock_boost_delay_s=mass_lock_boost_delay_s,
+            boost_delay_s=mass_lock_boost_delay_s,
             sleeper=sleeper,
             progress_fn=progress_fn,
         )
@@ -247,11 +219,11 @@ def haul_loop(
                 map_settle_s=galaxy_map_settle_s,
                 progress_fn=progress_fn,
             )
-        _escape_mass_lock(
+        escape_mass_lock(
             controls,
             journal_dir=journal_dir,
             step_delay_s=step_delay_s,
-            mass_lock_boost_delay_s=mass_lock_boost_delay_s,
+            boost_delay_s=mass_lock_boost_delay_s,
             sleeper=sleeper,
             progress_fn=progress_fn,
         )
