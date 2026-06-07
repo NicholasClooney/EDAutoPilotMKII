@@ -180,6 +180,7 @@ class ControlRoomApp(App[None]):
     BINDINGS = [
         ("ctrl+c", "request_quit", "Quit"),
         ("ctrl+d", "request_quit", "Quit"),
+        ("ctrl+r", "open_history", "History"),
     ]
 
     CSS = """
@@ -253,6 +254,7 @@ class ControlRoomApp(App[None]):
         self._saved_state = ControlRoomState()
         self._resume_entries: list[ReplaySelection] = []
         self._resume_open = False
+        self._resume_filter = ""
         self._shutdown_requested: bool = False
         self._shutdown_finalized: bool = False
         self._watcher_worker: Any | None = None
@@ -456,26 +458,50 @@ class ControlRoomApp(App[None]):
         marker = "* " if self._default_haul_matches(entry) else "  "
         return marker + _resume_summary(entry)
 
-    def _show_resume_picker(self) -> None:
-        if not self._saved_state.history:
-            self._log("[dim]No saved command history yet.[/]")
-            return
-
-        self._resume_entries = [
+    def _filtered_resume_entries(self) -> list[ReplaySelection]:
+        prefix = self._resume_filter.lower()
+        history = [
+            entry for entry in reversed(self._saved_state.history)
+            if not prefix or entry.raw.lower().startswith(prefix)
+        ]
+        if self._saved_state.default_haul:
+            pinned = [e for e in history if self._default_haul_matches(e)]
+            rest = [e for e in history if not self._default_haul_matches(e)]
+            history = pinned[:1] + rest
+        return [
             ReplaySelection(
                 entry=entry,
                 label=self._resume_label(entry),
                 detail=_resume_detail(entry),
             )
-            for entry in reversed(self._saved_state.history)
+            for entry in history
         ]
+
+    def _refresh_resume_help(self) -> None:
+        filter_label = self._resume_filter or "none"
+        help_text = (
+            "Replay history  |  Enter execute  |  e edit  |  * set default haul  |  "
+            "type prefix filter  |  Backspace delete  |  Esc/q close\n"
+            f"Filter: {filter_label}"
+        )
+        self.query_one("#resume-help", Static).update(help_text)
+
+    def _show_resume_picker(self) -> None:
+        if not self._saved_state.history:
+            self._log("[dim]No saved command history yet.[/]")
+            return
+
+        self._resume_filter = ""
+        self._resume_entries = self._filtered_resume_entries()
         option_list = self.query_one("#resume-list", OptionList)
         option_list.clear_options()
         option_list.add_options([item.label for item in self._resume_entries])
-        option_list.highlighted = 0
+        if self._resume_entries:
+            option_list.highlighted = 0
         self._resume_open = True
         self.query_one("#activity", RichLog).styles.display = "none"
         self.query_one("#resume-browser", Vertical).styles.display = "block"
+        self._refresh_resume_help()
         self._update_resume_detail()
         self.set_focus(option_list)
 
@@ -484,22 +510,17 @@ class ControlRoomApp(App[None]):
             return
         option_list = self.query_one("#resume-list", OptionList)
         highlighted = option_list.highlighted or 0
-        self._resume_entries = [
-            ReplaySelection(
-                entry=entry,
-                label=self._resume_label(entry),
-                detail=_resume_detail(entry),
-            )
-            for entry in reversed(self._saved_state.history)
-        ]
+        self._resume_entries = self._filtered_resume_entries()
         option_list.clear_options()
         option_list.add_options([item.label for item in self._resume_entries])
         if self._resume_entries:
             option_list.highlighted = min(highlighted, len(self._resume_entries) - 1)
+        self._refresh_resume_help()
         self._update_resume_detail()
 
     def _close_resume_picker(self) -> None:
         self._resume_open = False
+        self._resume_filter = ""
         self.query_one("#resume-browser", Vertical).styles.display = "none"
         self.query_one("#activity", RichLog).styles.display = "block"
         self.set_focus(self.query_one("#cmd", Input))
@@ -1035,6 +1056,7 @@ class ControlRoomApp(App[None]):
         controls = self._make_controls(progress)
         sleeper = self._make_sleeper()
         step_delay = self._config.controls.step_delay_seconds
+        nav_delay = self._config.controls.market_nav_delay_seconds
         market_path = self._market_path
         watcher = self._make_watcher()
 
@@ -1048,6 +1070,7 @@ class ControlRoomApp(App[None]):
             target=target,
             amount=amount,
             step_delay_s=step_delay,
+            nav_delay_s=nav_delay,
             sleeper=sleeper,
             progress_fn=progress,
         ))
@@ -1083,6 +1106,7 @@ class ControlRoomApp(App[None]):
         controls = self._make_controls(progress)
         sleeper = self._make_sleeper()
         step_delay = self._config.controls.step_delay_seconds
+        nav_delay = self._config.controls.market_nav_delay_seconds
         market_path = self._market_path
         watcher = self._make_watcher()
 
@@ -1095,6 +1119,7 @@ class ControlRoomApp(App[None]):
             target=target,
             amount=amount,
             step_delay_s=step_delay,
+            nav_delay_s=nav_delay,
             sleeper=sleeper,
             progress_fn=progress,
         ))
@@ -1113,6 +1138,7 @@ class ControlRoomApp(App[None]):
         controls = self._make_controls(progress)
         sleeper = self._make_sleeper()
         step_delay = self._config.controls.step_delay_seconds
+        nav_delay = self._config.controls.market_nav_delay_seconds
         market_path = self._market_path
         watcher = self._make_watcher()
 
@@ -1134,6 +1160,7 @@ class ControlRoomApp(App[None]):
                         target=name,
                         amount="MAX",
                         step_delay_s=step_delay,
+                        nav_delay_s=nav_delay,
                         sleeper=sleeper,
                         progress_fn=progress,
                     )
@@ -1389,6 +1416,14 @@ class ControlRoomApp(App[None]):
         self.workers.cancel_group(self, "routines")
         self.exit()
 
+    def action_open_history(self) -> None:
+        if self._haul_prompt_step or self._dest_prompt_destination:
+            return
+        if self._resume_open:
+            self._close_resume_picker()
+            return
+        self._show_resume_picker()
+
     # ── Command input ──────────────────────────────────────────────────────────
 
     def on_key(self, event) -> None:
@@ -1410,6 +1445,15 @@ class ControlRoomApp(App[None]):
             elif event.key == "enter":
                 event.prevent_default()
                 self._resume_execute_selected()
+            elif event.key == "backspace":
+                event.prevent_default()
+                if self._resume_filter:
+                    self._resume_filter = self._resume_filter[:-1]
+                    self._refresh_resume_picker()
+            elif event.character and event.character.isprintable() and len(event.character) == 1:
+                event.prevent_default()
+                self._resume_filter += event.character
+                self._refresh_resume_picker()
             return
         if self._haul_prompt_step or self._dest_prompt_destination:
             return  # don't interfere with multi-step haul prompts

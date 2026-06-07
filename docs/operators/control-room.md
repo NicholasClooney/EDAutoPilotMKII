@@ -42,6 +42,8 @@ uv run python3 control_room.py --config config.toml --market aluminium
 ## Notes
 
 - Only one routine runs at a time.
+- `Ctrl-R` opens replay/history from the command bar.
+- In replay/history, typing applies a simple prefix filter; `Backspace` deletes the filter.
 - `Ctrl-C` and `Ctrl-D` cancel the active routine without closing the TUI; when idle they exit the app.
 - `sell` with no explicit item falls back to `Cargo.json` if the in-memory cargo manifest is empty.
 - Cross-session command history and one saved default haul profile are persisted in `.control_room_state.json` by default.

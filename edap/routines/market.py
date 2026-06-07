@@ -94,6 +94,7 @@ def market_buy(
     target: str,
     amount: int | str,
     step_delay_s: float = 1.0,
+    nav_delay_s: float = 0.1,
     max_hold_s: float = 10.0,
     trade_timeout_s: float = 30.0,
     skip_station_check: bool = False,
@@ -104,8 +105,8 @@ def market_buy(
     return _market_trade(
         controls, watcher,
         market_path=market_path, target=target, amount=amount, side="buy",
-        step_delay_s=step_delay_s, max_hold_s=max_hold_s, trade_timeout_s=trade_timeout_s,
-        skip_station_check=skip_station_check,
+        step_delay_s=step_delay_s, nav_delay_s=nav_delay_s, max_hold_s=max_hold_s,
+        trade_timeout_s=trade_timeout_s, skip_station_check=skip_station_check,
         time_fn=time_fn, sleeper=sleeper, progress_fn=progress_fn,
     )
 
@@ -118,6 +119,7 @@ def market_sell(
     target: str,
     amount: int | str,
     step_delay_s: float = 1.0,
+    nav_delay_s: float = 0.1,
     max_hold_s: float = 10.0,
     trade_timeout_s: float = 30.0,
     skip_station_check: bool = False,
@@ -128,8 +130,8 @@ def market_sell(
     return _market_trade(
         controls, watcher,
         market_path=market_path, target=target, amount=amount, side="sell",
-        step_delay_s=step_delay_s, max_hold_s=max_hold_s, trade_timeout_s=trade_timeout_s,
-        skip_station_check=skip_station_check,
+        step_delay_s=step_delay_s, nav_delay_s=nav_delay_s, max_hold_s=max_hold_s,
+        trade_timeout_s=trade_timeout_s, skip_station_check=skip_station_check,
         time_fn=time_fn, sleeper=sleeper, progress_fn=progress_fn,
     )
 
@@ -143,6 +145,7 @@ def _market_trade(
     amount: int | str,
     side: str,
     step_delay_s: float,
+    nav_delay_s: float,
     max_hold_s: float,
     trade_timeout_s: float,
     skip_station_check: bool,
@@ -164,17 +167,17 @@ def _market_trade(
     # Station services UI takes a moment to populate after selection
     sleeper(7.0)
 
-    for fn, label in [
-        (controls.ui_down, "UI_Down (to commodities market)"),
-        (controls.ui_select, "UI_Select (open market)"),
+    for fn, label, delay in [
+        (controls.ui_down, "UI_Down (to commodities market)", nav_delay_s),
+        (controls.ui_select, "UI_Select (open market)", step_delay_s),
     ]:
         if progress_fn is not None:
             progress_fn(f"  {label}")
         dispatch = fn()
         if dispatch.status != "ok":
             return RoutineResult(action=dispatch.action, dispatch=dispatch, details={"phase": "navigate_to_market"})
-        if step_delay_s > 0:
-            sleeper(step_delay_s)
+        if delay > 0:
+            sleeper(delay)
 
     # Verify Market.json matches the current docked station.
     # The game writes it when the market screen opens; retry up to 3 times if delayed.
@@ -239,8 +242,8 @@ def _market_trade(
         dispatch = controls.ui_down()
         if dispatch.status != "ok":
             return RoutineResult(action="UI_Down", dispatch=dispatch, details={"phase": "navigate_to_sell_tab"})
-        if step_delay_s > 0:
-            sleeper(step_delay_s)
+        if nav_delay_s > 0:
+            sleeper(nav_delay_s)
 
         if progress_fn is not None:
             progress_fn("  UI_Select (enter SELL tab)")
@@ -267,8 +270,8 @@ def _market_trade(
             dispatch = controls.ui_down()
             if dispatch.status != "ok":
                 return RoutineResult(action="UI_Down", dispatch=dispatch, details={"phase": "navigate_to_item"})
-            if step_delay_s > 0:
-                sleeper(step_delay_s)
+            if nav_delay_s > 0:
+                sleeper(nav_delay_s)
 
     # Open the trade dialog for this item
     if progress_fn is not None:
@@ -314,8 +317,8 @@ def _market_trade(
     dispatch = controls.ui_down()
     if dispatch.status != "ok":
         return RoutineResult(action="UI_Down", dispatch=dispatch, details={"phase": "confirm"})
-    if step_delay_s > 0:
-        sleeper(step_delay_s)
+    if nav_delay_s > 0:
+        sleeper(nav_delay_s)
 
     if progress_fn is not None:
         progress_fn(f"  UI_Select (confirm {confirm_label})")

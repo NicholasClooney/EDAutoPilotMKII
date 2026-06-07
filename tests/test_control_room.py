@@ -38,6 +38,7 @@ def _make_config(journal_dir: Path) -> AppConfig:
             undock_timeout_seconds=30.0,
             mass_lock_escape_safety_delay_seconds=15.0,
             mass_lock_boost_delay_seconds=5.0,
+            market_nav_delay_seconds=0.1,
         ),
         screen=ScreenConfig(
             resolution_width=1920,
@@ -307,6 +308,32 @@ class ControlRoomBindingsTests(unittest.TestCase):
         self.assertEqual(defaults["sell_station"], "Jameson Memorial")
         self.assertEqual(defaults["sell_system"], "Shinrarta Dezhra")
         self.assertEqual(defaults["galaxy_map_settle"], "5.0")
+
+    def test_filtered_resume_entries_uses_prefix_match(self) -> None:
+        self.app._saved_state.history = [
+            CommandHistoryEntry(raw="dock", command="dock", timestamp="1"),
+            CommandHistoryEntry(raw="dest Sol", command="dest", timestamp="2"),
+            CommandHistoryEntry(raw="dest Colonia", command="dest", timestamp="3"),
+            CommandHistoryEntry(raw="sell Aluminium", command="sell", timestamp="4"),
+        ]
+
+        self.app._resume_filter = "dest "
+        labels = [item.label for item in self.app._filtered_resume_entries()]
+
+        self.assertEqual(len(labels), 2)
+        self.assertIn("dest Colonia", labels[0])
+        self.assertIn("dest Sol", labels[1])
+
+    def test_filtered_resume_entries_empty_filter_returns_full_history(self) -> None:
+        self.app._saved_state.history = [
+            CommandHistoryEntry(raw="dock", command="dock", timestamp="1"),
+            CommandHistoryEntry(raw="jump", command="jump", timestamp="2"),
+        ]
+
+        self.app._resume_filter = ""
+        raws = [item.entry.raw for item in self.app._filtered_resume_entries()]
+
+        self.assertEqual(raws, ["jump", "dock"])
 
 
 if __name__ == "__main__":
