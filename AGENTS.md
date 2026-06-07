@@ -80,3 +80,9 @@ Examples:
 - `refactor: extract journal parsing from dev_autopilot`
 - `docs: update README for macOS-first roadmap`
 - `fix: handle missing bindings file gracefully`
+
+## Release Style
+
+- Tag stable releases as semantic versions like `v1.0.0`.
+- Use GitHub release titles in the form `EDAutoPilot Mk II vX.Y.Z - <short release label>`.
+- Release notes should stay high level: summarize the major operator-facing capabilities, especially `control_room.py`, available routines, and any other significant platform/runtime milestones.
