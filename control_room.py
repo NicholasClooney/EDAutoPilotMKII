@@ -216,7 +216,7 @@ _COMMANDS: list[_CommandHelp] = [
         name="resume",
         usage="resume",
         summary="Open the recent-command picker for execute-or-edit replay.",
-        detail="Shows a scrollable list of recent saved commands across sessions. Press Enter to execute the selected entry immediately, or press e to reopen it for editing.",
+        detail="Shows a scrollable list of recent saved commands across sessions. Press Enter to execute the selected entry immediately, press e to reopen it for editing, or press * on a haul entry to save or clear it as the default haul setup.",
     ),
     _CommandHelp(
         name="quit",
@@ -416,7 +416,7 @@ class ControlRoomApp(App[None]):
         with Vertical(id="resume-modal"):
             with Vertical(id="resume-dialog"):
                 yield Static(
-                    "Recent commands  |  Enter execute  |  e edit  |  Esc/q close",
+                    "Recent commands  |  Enter execute  |  e edit  |  * set default haul  |  Esc/q close",
                     id="resume-help",
                 )
                 yield OptionList(id="resume-list")
@@ -595,6 +595,13 @@ class ControlRoomApp(App[None]):
         self._history_draft = ""
         self._save_saved_state()
 
+    def _default_haul_matches(self, entry: CommandHistoryEntry) -> bool:
+        return entry.command == "haul" and bool(self._saved_state.default_haul) and entry.params == self._saved_state.default_haul
+
+    def _resume_label(self, entry: CommandHistoryEntry) -> str:
+        marker = "* " if self._default_haul_matches(entry) else "  "
+        return marker + _resume_summary(entry)
+
     def _show_resume_picker(self) -> None:
         if not self._saved_state.history:
             self._log("[dim]No saved command history yet.[/]")
@@ -603,7 +610,7 @@ class ControlRoomApp(App[None]):
         self._resume_entries = [
             _ResumeSelection(
                 entry=entry,
-                label=_resume_summary(entry),
+                label=self._resume_label(entry),
                 detail=_resume_detail(entry),
             )
             for entry in reversed(self._saved_state.history)
@@ -616,6 +623,25 @@ class ControlRoomApp(App[None]):
         self.query_one("#resume-modal", Vertical).styles.display = "block"
         self._update_resume_detail()
         self.set_focus(option_list)
+
+    def _refresh_resume_picker(self) -> None:
+        if not self._resume_open:
+            return
+        option_list = self.query_one("#resume-list", OptionList)
+        highlighted = option_list.highlighted or 0
+        self._resume_entries = [
+            _ResumeSelection(
+                entry=entry,
+                label=self._resume_label(entry),
+                detail=_resume_detail(entry),
+            )
+            for entry in reversed(self._saved_state.history)
+        ]
+        option_list.clear_options()
+        option_list.add_options([item.label for item in self._resume_entries])
+        if self._resume_entries:
+            option_list.highlighted = min(highlighted, len(self._resume_entries) - 1)
+        self._update_resume_detail()
 
     def _close_resume_picker(self) -> None:
         self._resume_open = False
@@ -652,6 +678,23 @@ class ControlRoomApp(App[None]):
         self._close_resume_picker()
         self._replay_history_entry(entry, edit=True)
 
+    def _resume_toggle_default_selected(self) -> None:
+        entry = self._selected_resume_entry()
+        if entry is None:
+            return
+        if entry.command != "haul":
+            self._log("[dim]Only haul entries can be saved as the default.[/]")
+            return
+        if self._default_haul_matches(entry):
+            self._saved_state.default_haul = {}
+            self._log("[dim]Cleared saved default haul.[/]")
+        else:
+            self._saved_state.default_haul = {str(key): str(value) for key, value in entry.params.items()}
+            commodity = self._saved_state.default_haul.get("commodity", "haul")
+            self._log(f"[dim]Saved default haul from history: {escape(commodity)}[/]")
+        self._save_saved_state()
+        self._refresh_resume_picker()
+
     def _replay_history_entry(self, entry: CommandHistoryEntry, *, edit: bool) -> None:
         if edit:
             if entry.command == "haul":
@@ -682,7 +725,7 @@ class ControlRoomApp(App[None]):
             destination = str(entry.params.get("destination", "")).strip()
             if destination:
                 settle_value = entry.params.get("galaxy_map_settle")
-                settle = float(settle_value) if settle_value is not None else self._saved_dest_settle_default()
+                settle = float(settle_value) if settle_value is not None else self._config.controls.galaxy_map_settle_seconds
                 self._dispatch_dest(destination, settle)
             return
 
@@ -968,15 +1011,9 @@ class ControlRoomApp(App[None]):
             progress_fn=progress,
         ))
 
-    def _saved_dest_settle_default(self) -> float:
-        value = self._saved_state.dest_defaults.get("galaxy_map_settle")
-        if isinstance(value, (int, float)):
-            return float(value)
-        return self._config.controls.galaxy_map_settle_seconds
-
     def _start_dest_prompt(self, destination: str, *, settle_default: float | None = None) -> None:
         self._dest_prompt_destination = destination
-        self._dest_prompt_settle_default = settle_default if settle_default is not None else self._saved_dest_settle_default()
+        self._dest_prompt_settle_default = settle_default if settle_default is not None else self._config.controls.galaxy_map_settle_seconds
         default_settle = self._dest_prompt_settle_default
         self._log(f"Destination: [bold]{escape(destination)}[/]")
         self._log(
@@ -1002,7 +1039,6 @@ class ControlRoomApp(App[None]):
         step_delay = self._config.controls.step_delay_seconds
         journal_dir = self._journal_dir
 
-        self._saved_state.dest_defaults["galaxy_map_settle"] = galaxy_map_settle
         self._record_history_entry(CommandHistoryEntry(
             raw=f"dest {destination}",
             command="dest",
@@ -1028,7 +1064,7 @@ class ControlRoomApp(App[None]):
         ))
 
     def _saved_haul_defaults(self, seed: dict[str, str] | None = None) -> dict[str, str]:
-        defaults = dict(self._saved_state.haul_defaults)
+        defaults = dict(self._saved_state.default_haul)
         if seed:
             defaults.update({key: value for key, value in seed.items() if value != ""})
         if not defaults.get("sell_station") and self._ship.station:
@@ -1036,7 +1072,7 @@ class ControlRoomApp(App[None]):
         if not defaults.get("sell_system") and self._ship.system:
             defaults["sell_system"] = self._ship.system
         if not defaults.get("galaxy_map_settle"):
-            defaults["galaxy_map_settle"] = str(self._saved_dest_settle_default())
+            defaults["galaxy_map_settle"] = str(self._config.controls.galaxy_map_settle_seconds)
         if not defaults.get("dock_timeout"):
             defaults["dock_timeout"] = str(self._config.controls.haul_dock_timeout_seconds)
         return defaults
@@ -1295,7 +1331,7 @@ class ControlRoomApp(App[None]):
                 self._log(f"  Buy system: [cyan]{escape(resolved)}[/]")
             else:
                 self._log("  Buy system: [dim](none)[/]")
-            default_settle = float(self._haul_prompt_defaults.get("galaxy_map_settle", self._saved_dest_settle_default()))
+            default_settle = float(self._haul_prompt_defaults.get("galaxy_map_settle", self._config.controls.galaxy_map_settle_seconds))
             self._haul_prompt_step = "galaxy_map_settle"
             self._log(
                 f"[dim]Galaxy-map settle seconds? "
@@ -1307,7 +1343,7 @@ class ControlRoomApp(App[None]):
         elif self._haul_prompt_step == "galaxy_map_settle":
             parsed = self._parse_optional_nonnegative_float(
                 value,
-                default=float(self._haul_prompt_defaults.get("galaxy_map_settle", self._saved_dest_settle_default())),
+                default=float(self._haul_prompt_defaults.get("galaxy_map_settle", self._config.controls.galaxy_map_settle_seconds)),
                 label="Galaxy-map settle seconds",
             )
             if parsed is None:
@@ -1383,20 +1419,18 @@ class ControlRoomApp(App[None]):
         journal_dir = self._journal_dir
         watcher = self._make_watcher()
 
-        self._saved_state.haul_defaults = {
-            "commodity": commodity,
-            "buy_station": buy_station,
-            "sell_station": sell_station,
-            "sell_system": sell_system,
-            "buy_system": buy_system,
-            "galaxy_map_settle": str(galaxy_map_settle),
-            "dock_timeout": str(dock_timeout),
-        }
-        self._saved_state.dest_defaults["galaxy_map_settle"] = galaxy_map_settle
         self._record_history_entry(CommandHistoryEntry(
             raw=f"haul {commodity}",
             command="haul",
-            params=dict(self._saved_state.haul_defaults),
+            params={
+                "commodity": commodity,
+                "buy_station": buy_station,
+                "sell_station": sell_station,
+                "sell_system": sell_system,
+                "buy_system": buy_system,
+                "galaxy_map_settle": str(galaxy_map_settle),
+                "dock_timeout": str(dock_timeout),
+            },
             timestamp=_now_iso(),
         ))
 
@@ -1472,6 +1506,9 @@ class ControlRoomApp(App[None]):
             elif event.key == "e":
                 event.prevent_default()
                 self._resume_edit_selected()
+            elif event.key == "*":
+                event.prevent_default()
+                self._resume_toggle_default_selected()
             elif event.key == "enter":
                 event.prevent_default()
                 self._resume_execute_selected()
@@ -1512,7 +1549,7 @@ class ControlRoomApp(App[None]):
             destination = self._dest_prompt_destination
             parsed = self._parse_optional_nonnegative_float(
                 raw,
-                default=self._dest_prompt_settle_default or self._saved_dest_settle_default(),
+                default=self._dest_prompt_settle_default or self._config.controls.galaxy_map_settle_seconds,
                 label="Galaxy-map settle seconds",
             )
             if parsed is None:

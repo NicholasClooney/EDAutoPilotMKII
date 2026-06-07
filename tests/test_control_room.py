@@ -224,6 +224,23 @@ class ControlRoomCommandTests(unittest.TestCase):
         self.assertEqual([entry.raw for entry in self.app._saved_state.history], ["jump", "undock"])
         self.assertEqual(self.app._history, ["jump", "undock"])
 
+    def test_saved_haul_defaults_use_explicit_default_haul(self) -> None:
+        self.app._saved_state.default_haul = {
+            "commodity": "Aluminium",
+            "buy_station": "Hutton Orbital",
+            "galaxy_map_settle": "5.0",
+        }
+        self.app._ship.station = "Jameson Memorial"
+        self.app._ship.system = "Shinrarta Dezhra"
+
+        defaults = self.app._saved_haul_defaults()
+
+        self.assertEqual(defaults["commodity"], "Aluminium")
+        self.assertEqual(defaults["buy_station"], "Hutton Orbital")
+        self.assertEqual(defaults["sell_station"], "Jameson Memorial")
+        self.assertEqual(defaults["sell_system"], "Shinrarta Dezhra")
+        self.assertEqual(defaults["galaxy_map_settle"], "5.0")
+
 
 if __name__ == "__main__":
     unittest.main()

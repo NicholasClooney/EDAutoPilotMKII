@@ -17,16 +17,14 @@ class ControlRoomStateTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             state = load_control_room_state(Path(temp_dir) / "missing.json")
 
-        self.assertEqual(state.haul_defaults, {})
-        self.assertEqual(state.dest_defaults, {})
+        self.assertEqual(state.default_haul, {})
         self.assertEqual(state.history, [])
 
     def test_save_and_load_round_trip(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             path = Path(temp_dir) / "state.json"
             original = ControlRoomState(
-                haul_defaults={"commodity": "Aluminium", "buy_station": "Hutton Orbital"},
-                dest_defaults={"galaxy_map_settle": 5.0},
+                default_haul={"commodity": "Aluminium", "buy_station": "Hutton Orbital"},
                 history=[
                     CommandHistoryEntry(
                         raw="haul Aluminium",
@@ -40,11 +38,19 @@ class ControlRoomStateTests(unittest.TestCase):
             save_control_room_state(path, original)
             loaded = load_control_room_state(path)
 
-        self.assertEqual(loaded.haul_defaults["commodity"], "Aluminium")
-        self.assertEqual(loaded.dest_defaults["galaxy_map_settle"], 5.0)
+        self.assertEqual(loaded.default_haul["commodity"], "Aluminium")
         self.assertEqual(len(loaded.history), 1)
         self.assertEqual(loaded.history[0].raw, "haul Aluminium")
         self.assertEqual(loaded.history[0].params["dock_timeout"], "600.0")
+
+    def test_loads_legacy_haul_defaults_key_for_backward_compatibility(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "state.json"
+            path.write_text('{"haul_defaults":{"commodity":"Gold"},"history":[]}', encoding="utf-8")
+
+            loaded = load_control_room_state(path)
+
+        self.assertEqual(loaded.default_haul["commodity"], "Gold")
 
 
 if __name__ == "__main__":

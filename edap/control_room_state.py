@@ -17,8 +17,7 @@ class CommandHistoryEntry:
 
 @dataclass
 class ControlRoomState:
-    haul_defaults: dict[str, str] = field(default_factory=dict)
-    dest_defaults: dict[str, Any] = field(default_factory=dict)
+    default_haul: dict[str, str] = field(default_factory=dict)
     history: list[CommandHistoryEntry] = field(default_factory=list)
 
 
@@ -32,13 +31,9 @@ def load_control_room_state(path: Path) -> ControlRoomState:
     if not isinstance(raw, dict):
         return ControlRoomState()
 
-    haul_defaults = raw.get("haul_defaults", {})
-    if not isinstance(haul_defaults, dict):
-        haul_defaults = {}
-
-    dest_defaults = raw.get("dest_defaults", {})
-    if not isinstance(dest_defaults, dict):
-        dest_defaults = {}
+    default_haul = raw.get("default_haul", raw.get("haul_defaults", {}))
+    if not isinstance(default_haul, dict):
+        default_haul = {}
 
     raw_history = raw.get("history", [])
     history: list[CommandHistoryEntry] = []
@@ -66,8 +61,7 @@ def load_control_room_state(path: Path) -> ControlRoomState:
             )
 
     return ControlRoomState(
-        haul_defaults={str(key): str(value) for key, value in haul_defaults.items()},
-        dest_defaults=dest_defaults,
+        default_haul={str(key): str(value) for key, value in default_haul.items()},
         history=history,
     )
 
@@ -75,8 +69,7 @@ def load_control_room_state(path: Path) -> ControlRoomState:
 def save_control_room_state(path: Path, state: ControlRoomState) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
-        "haul_defaults": state.haul_defaults,
-        "dest_defaults": state.dest_defaults,
+        "default_haul": state.default_haul,
         "history": [
             {
                 "raw": entry.raw,
