@@ -185,6 +185,28 @@ class ControlRoomCommandTests(unittest.TestCase):
         self.assertTrue(worker.cancelled)
         self.assertEqual(self.app.exit_calls, 0)
 
+    def test_pending_sigint_cancels_active_routine_without_exiting(self) -> None:
+        worker = _FakeWorker()
+        self.app._routine_active = True
+        self.app._routine_worker = worker
+
+        self.app.request_sigint()
+        self.app._drain_pending_sigint()
+
+        self.assertFalse(self.app._sigint_pending)
+        self.assertFalse(self.app._shutdown_requested)
+        self.assertTrue(worker.cancelled)
+        self.assertEqual(self.app.exit_calls, 0)
+
+    def test_pending_sigint_exits_when_idle(self) -> None:
+        self.app.request_sigint()
+
+        self.app._drain_pending_sigint()
+
+        self.assertFalse(self.app._sigint_pending)
+        self.assertTrue(self.app._shutdown_requested)
+        self.assertEqual(self.app.exit_calls, 1)
+
     def test_bootstrap_ship_state_reads_balance_and_cargo_from_status_json(self) -> None:
         journal_dir = Path(self.tmpdir.name)
         (journal_dir / "Journal.240101000000.01.log").write_text(

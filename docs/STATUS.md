@@ -2,7 +2,7 @@
 
 _This is the maintained status document for the repo. Update it at the end of each session when project understanding, port status, or next steps change. Keep it current over time rather than treating it as a frozen checkpoint._
 
-Last updated: 2026-06-07 (session 43)
+Last updated: 2026-06-07 (session 44)
 
 ## Where We Are
 
@@ -42,6 +42,7 @@ Latest live validation on the current macOS + CrossOver setup:
 - Control-room `sell` (no item) now falls back to `Cargo.json` when the live in-memory cargo manifest is empty because no fresh `Cargo` journal event has arrived yet; this removes the mismatch where haul-loop sell could see cargo that control room sell-all could not
 - Test-running docs now consistently require `uv run python3 -m unittest ...` rather than the bare system interpreter, after a local verification run showed `python3 -m unittest` could miss project dependencies like `textual`
 - `uv run python3 control_room.py` is now live-validated for interrupt handling: `Ctrl-C` during an active routine cancels the worker without closing the TUI, and `Ctrl-C` when idle exits cleanly without the earlier extra-interrupt / stop-exception noise
+- Control-room quit handling no longer relies on Textual receiving `Ctrl-C` as a keybinding. `main()` now installs a `SIGINT` handler that marks a pending interrupt, and the app drains that flag on the UI loop to route terminal `Ctrl-C` through the same cancel-or-exit path used by `Ctrl-D`.
 - `control_room.py` now persists operator state to a local JSON file (`control_room.state_file`, default `.control_room_state.json`): recent command history is retained across sessions (`control_room.history_limit`, default 20), and an explicit default haul profile can be saved from history for reuse across restarts
 - `replay` (alias `history`) is now implemented in `control_room.py` as a scrollable picker backed by structured saved history: Enter re-executes the selected command immediately, `e` reopens it for editing, and `*` on a haul entry saves or clears that haul setup as the explicit default used by later `haul` prompt flows
 - Replay/history navigation now also supports `Ctrl-R` to open from the command bar and inline typed prefix filtering inside the picker (`Backspace` removes filter text)

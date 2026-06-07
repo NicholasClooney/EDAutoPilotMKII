@@ -34,6 +34,7 @@ Other:
 from __future__ import annotations
 
 import argparse
+import signal
 import sys
 import time
 from pathlib import Path
@@ -371,6 +372,14 @@ class ControlRoomApp(App[None]):
         self._runtime_state.verbose_controls = value
 
     @property
+    def _sigint_pending(self) -> bool:
+        return self._runtime_state.sigint_pending
+
+    @_sigint_pending.setter
+    def _sigint_pending(self, value: bool) -> None:
+        self._runtime_state.sigint_pending = value
+
+    @property
     def _shutdown_requested(self) -> bool:
         return self._runtime_state.shutdown_requested
 
@@ -421,6 +430,7 @@ class ControlRoomApp(App[None]):
         self._refresh_haul_stats()
         self._refresh_market()
         self._watcher_worker = self._start_watcher()
+        self.set_interval(0.1, self._drain_pending_sigint)
         self.set_focus(self.query_one("#cmd", Input))
         self._update_resume_detail()
 
@@ -559,6 +569,15 @@ class ControlRoomApp(App[None]):
             self._cancel_active_routine("Ctrl-C / Ctrl-D")
             return
         self._request_shutdown("Ctrl-C / Ctrl-D")
+
+    def request_sigint(self) -> None:
+        self._sigint_pending = True
+
+    def _drain_pending_sigint(self) -> None:
+        if not self._sigint_pending:
+            return
+        self._sigint_pending = False
+        self.action_request_quit()
 
     def _cancel_active_routine(self, source: str) -> None:
         self._log(f"[yellow]{escape(source)} received — cancelling active routine.[/]")
@@ -713,7 +732,18 @@ def main() -> None:
         )
         sys.exit(1)
 
-    ControlRoomApp(ctx, market_filter=args.market).run()
+    app = ControlRoomApp(ctx, market_filter=args.market)
+    previous_sigint = signal.getsignal(signal.SIGINT)
+
+    def handle_sigint(signum, frame) -> None:  # type: ignore[no-untyped-def]
+        del signum, frame
+        app.request_sigint()
+
+    signal.signal(signal.SIGINT, handle_sigint)
+    try:
+        app.run()
+    finally:
+        signal.signal(signal.SIGINT, previous_sigint)
 
 
 if __name__ == "__main__":
