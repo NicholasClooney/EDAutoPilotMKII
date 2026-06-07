@@ -10,6 +10,8 @@ Usage:
 Routine commands (type in the input bar):
     dock               dock + auto-refuel; skips supercruise-exit wait if already in normal space
     undock             launch from station
+    boost              fire boost three times immediately
+    escape             set speed full, then boost until Status.json says mass lock cleared
     buy <item> [N]     buy N units (default MAX) of commodity
     sell [item] [N]    sell commodity (default: market filter); amount default MAX
     jump               FSD jump sequence
@@ -67,7 +69,7 @@ from edap.state import JournalWatcher, get_latest_journal_log, read_ship_state
 
 _ALL_ROUTINE_ACTIONS = list(DEFAULT_SHIP_CONTROL_ACTIONS)
 
-_DEFAULT_COMMAND_PLACEHOLDER = "commands | help dock | replay | dock | undock | escape | jump | buy <item> [N] | sell [item] | haul [commodity] | dest <system> | market ... | q"
+_DEFAULT_COMMAND_PLACEHOLDER = "commands | help dock | replay | dock | undock | boost | escape | jump | buy <item> [N] | sell [item] | haul [commodity] | dest <system> | market ... | q"
 
 
 class _RoutineCancelled(Exception):
@@ -886,6 +888,25 @@ class ControlRoomApp(App[None]):
             progress_fn=progress,
         ))
 
+    def _cmd_boost(self) -> None:
+        if not self._check_routine_ready():
+            return
+        progress = self._make_progress()
+        controls = self._make_controls(progress)
+
+        self._routine_active = True
+        self._log("Boosting 3x...")
+
+        def run_boost() -> RoutineResult:
+            result = controls.boost(repeat=3)
+            return RoutineResult(
+                action="Boost",
+                dispatch=result,
+                details={"boost_count": 3},
+            )
+
+        self._routine_worker = self._run_in_thread(run_boost)
+
     def _start_dest_prompt(self, destination: str, *, settle_default: float | None = None) -> None:
         self._dest_prompt_destination = destination
         self._dest_prompt_settle_default = settle_default if settle_default is not None else self._config.controls.galaxy_map_settle_seconds
@@ -1464,9 +1485,12 @@ class ControlRoomApp(App[None]):
         elif verb == "jump":
             self._record_history_entry(CommandHistoryEntry(raw=raw, command="jump", timestamp=_now_iso()))
             self._cmd_jump()
-        elif verb in {"escape", "boost"}:
+        elif verb == "escape":
             self._record_history_entry(CommandHistoryEntry(raw=raw, command="escape", timestamp=_now_iso()))
             self._cmd_escape()
+        elif verb == "boost":
+            self._record_history_entry(CommandHistoryEntry(raw=raw, command="boost", timestamp=_now_iso()))
+            self._cmd_boost()
         elif verb == "buy":
             self._cmd_buy(raw_rest)
         elif verb == "sell":

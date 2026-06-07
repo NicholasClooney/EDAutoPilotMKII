@@ -180,6 +180,61 @@ class ControlRoomBindingsTests(unittest.TestCase):
         self.assertEqual(captured["kwargs"]["undock_timeout_s"], 30.0)
         self.assertEqual(captured["kwargs"]["step_delay_s"], 0.3)
 
+    def test_escape_command_calls_mass_lock_routine(self) -> None:
+        captured: dict[str, object] = {}
+
+        self.app._controls = object()
+        self.app._make_progress = lambda: (lambda _: None)
+        self.app._make_controls = lambda progress: object()
+        self.app._make_sleeper = lambda: (lambda _: None)
+        self.app._run_in_thread = lambda fn: fn()
+
+        def fake_escape_mass_lock(controls, **kwargs):
+            captured["controls"] = controls
+            captured["kwargs"] = kwargs
+            return None
+
+        with patch("control_room.escape_mass_lock", new=fake_escape_mass_lock):
+            self.app._cmd_escape()
+
+        self.assertEqual(captured["kwargs"]["boost_delay_s"], 5.0)
+        self.assertEqual(captured["kwargs"]["step_delay_s"], 0.3)
+
+    def test_boost_command_dispatches_three_boosts(self) -> None:
+        controls = object()
+        dispatch = ActionDispatchResult(action="UseBoostJuice", status="ok")
+        captured: dict[str, object] = {}
+
+        class _BoostControls:
+            def boost(self, repeat: int = 1, hold_s: float | None = None) -> ActionDispatchResult:
+                captured["repeat"] = repeat
+                captured["hold_s"] = hold_s
+                return dispatch
+
+        self.app._controls = controls
+        self.app._make_progress = lambda: (lambda _: None)
+        self.app._make_controls = lambda progress: _BoostControls()
+        self.app._run_in_thread = lambda fn: fn()
+
+        result = self.app._cmd_boost()
+
+        self.assertIsNone(result)
+        self.assertEqual(captured["repeat"], 3)
+        self.assertIsNone(captured["hold_s"])
+        self.assertIn("Boosting 3x...", self.app.logged)
+
+    def test_boost_command_history_is_distinct_from_escape(self) -> None:
+        called: list[str] = []
+        self.app._cmd_boost = lambda: called.append("boost")
+        self.app._cmd_escape = lambda: called.append("escape")
+
+        self.app._dispatch_command("boost")
+        self.app._dispatch_command("escape")
+
+        self.assertEqual(called, ["boost", "escape"])
+        self.assertEqual(self.app._saved_state.history[-2].command, "boost")
+        self.assertEqual(self.app._saved_state.history[-1].command, "escape")
+
     def test_sell_all_falls_back_to_cargo_json_when_live_manifest_is_empty(self) -> None:
         cargo_path = Path(self.tmpdir.name) / "Cargo.json"
         cargo_path.write_text(json.dumps({
