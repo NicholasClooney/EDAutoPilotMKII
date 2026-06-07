@@ -1,4 +1,4 @@
-# EDAutopilot
+# EDAutopilot MK II
 
 Elite Dangerous autopilot experimentation using computer vision, journal parsing, and synthetic keyboard input.
 
