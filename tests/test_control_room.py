@@ -699,6 +699,41 @@ class ControlRoomDispatchTests(unittest.TestCase):
         self.assertEqual(entry.command, "verbose")
         self.assertEqual(entry.params, {"value": "on"})
 
+    def test_instant_toggle_flips_runtime_mode_and_records_history(self) -> None:
+        self.app._dispatch_command("instant")
+
+        self.assertTrue(self.app._instant_mode)
+        self.assertTrue(self.app._saved_state.instant_mode)
+        entry = self._last_history()
+        self.assertEqual(entry.command, "instant")
+        self.assertEqual(entry.params, {"value": ""})
+        self.assertIn("Instant mode on", "\n".join(self.app.logged))
+
+    def test_instant_off_restores_configured_delay(self) -> None:
+        self.app._instant_mode = True
+
+        self.app._dispatch_command("instant off")
+
+        self.assertFalse(self.app._instant_mode)
+        self.assertFalse(self.app._saved_state.instant_mode)
+        self.assertIn("Instant mode off", "\n".join(self.app.logged))
+
+    def test_load_saved_state_restores_persisted_instant_mode(self) -> None:
+        self.app._instant_mode = True
+        self.app._save_saved_state()
+        self.app._instant_mode = False
+
+        self.app._load_saved_state()
+
+        self.assertTrue(self.app._instant_mode)
+
+    def test_log_startup_modes_reports_instant_mode_state(self) -> None:
+        self.app._instant_mode = True
+
+        self.app._log_startup_modes()
+
+        self.assertIn("Instant mode on — control with: instant", "\n".join(self.app.logged))
+
     def test_market_filter_sets_filter_and_records_raw_value(self) -> None:
         self.app._dispatch_command("market filter Aluminium")
 
@@ -773,6 +808,40 @@ class ControlRoomDispatchTests(unittest.TestCase):
         self.assertEqual(delays, [])
         self.assertEqual(called, ["jump"])
         self.assertEqual(self._last_history().raw, "!jump")  # type: ignore[union-attr]
+        self.assertNotIn("Executing jump in 5.0s...", "\n".join(self.app.logged))
+
+    def test_instant_mode_skips_delay_without_bang_prefix(self) -> None:
+        delays: list[float] = []
+        called: list[str] = []
+
+        self.app._controls = object()
+        self.app._instant_mode = True
+        self.app._config = self.app._config.__class__(
+            paths=self.app._config.paths,
+            controls=self.app._config.controls,
+            screen=self.app._config.screen,
+            runtime=self.app._config.runtime,
+            control_room=ControlRoomConfig(
+                state_file=self.app._config.control_room.state_file,
+                history_limit=self.app._config.control_room.history_limit,
+                command_delay_seconds=5.0,
+            ),
+        )
+        self.app._make_progress = lambda: (lambda _: None)
+        self.app._make_controls = lambda progress: object()
+        self.app._make_watcher = lambda: object()
+        self.app._make_sleeper = lambda: (lambda delay: delays.append(delay))
+        self.app._run_in_thread = lambda fn: fn()
+
+        def fake_jump(controls, watcher, **kwargs):
+            called.append("jump")
+            return None
+
+        with patch("edap.control_room.routines_movement.jump", new=fake_jump):
+            self.app._dispatch_command("jump")
+
+        self.assertEqual(delays, [])
+        self.assertEqual(called, ["jump"])
         self.assertNotIn("Executing jump in 5.0s...", "\n".join(self.app.logged))
 
     def test_replay_execute_uses_same_command_delay(self) -> None:

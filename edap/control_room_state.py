@@ -19,6 +19,7 @@ class CommandHistoryEntry:
 class ControlRoomState:
     default_haul: dict[str, str] = field(default_factory=dict)
     history: list[CommandHistoryEntry] = field(default_factory=list)
+    instant_mode: bool = False
 
 
 def load_control_room_state(path: Path) -> ControlRoomState:
@@ -60,9 +61,14 @@ def load_control_room_state(path: Path) -> ControlRoomState:
                 )
             )
 
+    instant_mode = raw.get("instant_mode", False)
+    if not isinstance(instant_mode, bool):
+        instant_mode = False
+
     return ControlRoomState(
         default_haul={str(key): str(value) for key, value in default_haul.items()},
         history=history,
+        instant_mode=instant_mode,
     )
 
 
@@ -70,6 +76,7 @@ def save_control_room_state(path: Path, state: ControlRoomState) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "default_haul": state.default_haul,
+        "instant_mode": state.instant_mode,
         "history": [
             {
                 "raw": entry.raw,

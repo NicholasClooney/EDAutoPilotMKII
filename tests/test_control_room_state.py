@@ -19,12 +19,14 @@ class ControlRoomStateTests(unittest.TestCase):
 
         self.assertEqual(state.default_haul, {})
         self.assertEqual(state.history, [])
+        self.assertFalse(state.instant_mode)
 
     def test_save_and_load_round_trip(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             path = Path(temp_dir) / "state.json"
             original = ControlRoomState(
                 default_haul={"commodity": "Aluminium", "buy_station": "Hutton Orbital"},
+                instant_mode=True,
                 history=[
                     CommandHistoryEntry(
                         raw="haul Aluminium",
@@ -39,6 +41,7 @@ class ControlRoomStateTests(unittest.TestCase):
             loaded = load_control_room_state(path)
 
         self.assertEqual(loaded.default_haul["commodity"], "Aluminium")
+        self.assertTrue(loaded.instant_mode)
         self.assertEqual(len(loaded.history), 1)
         self.assertEqual(loaded.history[0].raw, "haul Aluminium")
         self.assertEqual(loaded.history[0].params["dock_timeout"], "600.0")
@@ -51,6 +54,7 @@ class ControlRoomStateTests(unittest.TestCase):
             loaded = load_control_room_state(path)
 
         self.assertEqual(loaded.default_haul["commodity"], "Gold")
+        self.assertFalse(loaded.instant_mode)
 
 
 if __name__ == "__main__":

@@ -404,6 +404,14 @@ class ControlRoomApp(App[None]):
         self._runtime_state.verbose_controls = value
 
     @property
+    def _instant_mode(self) -> bool:
+        return self._runtime_state.instant_mode
+
+    @_instant_mode.setter
+    def _instant_mode(self, value: bool) -> None:
+        self._runtime_state.instant_mode = value
+
+    @property
     def _sigint_pending(self) -> bool:
         return self._runtime_state.sigint_pending
 
@@ -456,6 +464,7 @@ class ControlRoomApp(App[None]):
         self.query_one("#market", Static).border_title = "MARKET"
         self._build_controls()
         self._load_saved_state()
+        self._log_startup_modes()
         self._bootstrap_ship_state()
         self._load_market_json()
         self._refresh_status()
@@ -484,6 +493,10 @@ class ControlRoomApp(App[None]):
 
     def _save_saved_state(self) -> None:
         _persistence.save_saved_state(self)
+
+    def _log_startup_modes(self) -> None:
+        state = "on" if self._instant_mode else "off"
+        self._log(f"[dim]Instant mode {state} — control with: instant[/]")
 
     def _bootstrap_ship_state(self) -> None:
         _bootstrap.bootstrap_ship_state(self)

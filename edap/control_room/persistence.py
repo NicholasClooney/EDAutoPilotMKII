@@ -16,6 +16,7 @@ from edap.control_room_state import (
 
 class PersistenceHost(Protocol):
     _config: AppConfig
+    _instant_mode: bool
     _saved_state: ControlRoomState
     _state_path: Path
     _history: list[str]
@@ -36,9 +37,11 @@ def load_saved_state(app: PersistenceHost) -> None:
         )
     app._history = [entry.raw for entry in app._saved_state.history if entry.raw]
     app._history_pos = len(app._history)
+    app._instant_mode = app._saved_state.instant_mode
 
 
 def save_saved_state(app: PersistenceHost) -> None:
+    app._saved_state.instant_mode = app._instant_mode
     try:
         save_control_room_state(app._state_path, app._saved_state)
     except Exception as exc:

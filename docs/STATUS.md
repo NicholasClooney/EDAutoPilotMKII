@@ -2,7 +2,7 @@
 
 _This is the maintained status document for the repo. Update it at the end of each session when project understanding, port status, or next steps change. Keep it current over time rather than treating it as a frozen checkpoint._
 
-Last updated: 2026-06-08 (session 47)
+Last updated: 2026-06-08 (session 48)
 
 ## Where We Are
 
@@ -46,6 +46,7 @@ Latest live validation on the current macOS + CrossOver setup:
 - `control_room.py` now persists operator state to a local JSON file (`control_room.state_file`, default `.control_room_state.json`): recent command history is retained across sessions (`control_room.history_limit`, default 20), and an explicit default haul profile can be saved from history for reuse across restarts
 - `replay` (alias `history`) is now implemented in `control_room.py` as a scrollable picker backed by structured saved history: Enter re-executes the selected command immediately, `e` reopens it for editing, and `*` on a haul entry saves or clears that haul setup as the explicit default used by later `haul` prompt flows
 - Replay/history navigation now also supports `Ctrl-R` to open from the command bar and inline typed prefix filtering inside the picker (`Backspace` removes filter text)
+- Control room now supports `instant` as a persisted toggle for command launch delay. `instant` or `instant on` disables the configured `control_room.command_delay_seconds` delay for future executable commands until `instant off` restores it; `!command` remains the one-shot immediate override. Startup now logs `Instant mode on/off — control with: instant` after saved control-room state loads.
 - Control-room `boost` and `escape` are now distinct: `boost` fires `UseBoostJuice` three times unconditionally, while `escape` remains the Status.json-driven mass-lock escape path (`SetSpeed100`, then poll `fsd_mass_locked` and boost until it clears)
 - `run_routine.py --routine set_gal_map_destination --destination "Colonia" --delay-seconds 5` live-validated: two input bugs found and fixed — modifier key was not explicitly pressed/released (caused ctrl bleed-through to subsequent keys), and `type_text` used keycode 0 for every character (CrossOver ignores the unicode string and reads the physical keycode, so all text arrived as AAAA...); both fixed in `edap/platform/input/macos.py`
 - Galaxy map destination flow re-validated after re-introducing the Odyssey-style result selection without poll/retry: `type_text("\n")` was no longer reliably committing the search field in live CrossOver runs, so the routine now submits search with a direct held Enter (default 0.2s). Current timing defaults: `open_settle_s` is now 5s, and the shared galaxy-map settle delay is now explicit (`controls.galaxy_map_settle_seconds`, CLI override `--galaxy-map-settle-seconds`) for both the post-result CamZoomIn wait and the post-plot settle wait. This same delay now flows through `dest` and `haul_loop`.

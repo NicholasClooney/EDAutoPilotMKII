@@ -72,6 +72,12 @@ CONTROL_ROOM_COMMANDS: list[CommandHelp] = [
         detail="When verbose mode is on, individual key presses from routine dispatch are written into the activity log. When off, only higher-level progress messages are shown.",
     ),
     CommandHelp(
+        name="instant",
+        usage="instant [on|off]",
+        summary="Toggle the control-room command launch delay off or on.",
+        detail="With no argument it toggles instant mode. When instant mode is on, executable commands launch immediately without the configured control-room start delay until you turn it off again. The ! prefix still works for one-off immediate launches.",
+    ),
+    CommandHelp(
         name="commands",
         usage="commands",
         summary="List every supported control-room command.",

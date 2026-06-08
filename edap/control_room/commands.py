@@ -65,6 +65,9 @@ def dispatch(app: CommandHost, raw: str, *, skip_delay_override: bool | None = N
     elif verb == "verbose":
         app._record_history_entry(CommandHistoryEntry(raw=raw, command="verbose", params={"value": rest}, timestamp=now_iso()))
         cmd_verbose(app, rest)
+    elif verb == "instant":
+        app._record_history_entry(CommandHistoryEntry(raw=raw, command="instant", params={"value": rest}, timestamp=now_iso()))
+        cmd_instant(app, rest)
     elif verb == "commands":
         app._record_history_entry(CommandHistoryEntry(raw=raw, command="commands", timestamp=now_iso()))
         cmd_commands(app)
@@ -120,6 +123,28 @@ def cmd_verbose(app: CommandHost, rest: str) -> None:
     else:
         state = "on" if app._verbose_controls else "off"
         app._log(f"[dim]verbose {state}  —  use: verbose on | verbose off[/]")
+
+
+def cmd_instant(app: CommandHost, rest: str) -> None:
+    value = rest.strip().lower()
+    if value in {"", "toggle"}:
+        app._instant_mode = not app._instant_mode
+    elif value in {"on", "1", "true"}:
+        app._instant_mode = True
+    elif value in {"off", "0", "false"}:
+        app._instant_mode = False
+    else:
+        state = "on" if app._instant_mode else "off"
+        app._log(f"[dim]instant {state}  —  use: instant | instant on | instant off[/]")
+        return
+
+    if app._instant_mode:
+        app._log("[dim]Instant mode on — command launch delay is disabled until you turn it off.[/]")
+    else:
+        delay_s = app._config.control_room.command_delay_seconds
+        app._log(f"[dim]Instant mode off — command launch delay restored to {delay_s:.1f}s.[/]")
+    app._saved_state.instant_mode = app._instant_mode
+    app._save_saved_state()
 
 
 def cmd_market(app: CommandHost, rest: str) -> None:

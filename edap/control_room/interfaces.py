@@ -7,17 +7,20 @@ from textual.widgets import Input
 
 from edap.config import AppConfig
 from edap.control_room.models import MarketData, ShipState
-from edap.control_room_state import CommandHistoryEntry
+from edap.control_room_state import CommandHistoryEntry, ControlRoomState
 from edap.progress_controls import ProgressShipControls
 
 
 class CommandHost(Protocol):
     _verbose_controls: bool
+    _instant_mode: bool
     _market_filter: str | None
     _market: MarketData
+    _saved_state: ControlRoomState
 
     def _log(self, msg: str) -> None: ...
     def _record_history_entry(self, entry: CommandHistoryEntry) -> None: ...
+    def _save_saved_state(self) -> None: ...
     def _request_shutdown(self, source: str) -> None: ...
     def _cmd_dock(self, *, skip_delay: bool = False) -> None: ...
     def _cmd_undock(self, *, skip_delay: bool = False) -> None: ...
@@ -52,6 +55,7 @@ class RoutineHost(Protocol):
     _routine_active: bool
     _routine_worker: Any | None
     _verbose_controls: bool
+    _instant_mode: bool
     _journal_dir: Path
     _market_path: Path
     _ship: ShipState

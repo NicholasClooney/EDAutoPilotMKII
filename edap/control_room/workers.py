@@ -130,7 +130,7 @@ def start_delayed_routine(
     active_routine_name: str | None = None,
     on_start: Callable[[], None] | None = None,
 ) -> None:
-    delay_s = 0.0 if skip_delay else app._config.control_room.command_delay_seconds
+    delay_s = 0.0 if (skip_delay or app._instant_mode) else app._config.control_room.command_delay_seconds
 
     def run_with_optional_delay() -> Any:
         if delay_s > 0:

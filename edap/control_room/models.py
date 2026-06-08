@@ -100,6 +100,7 @@ class RuntimeUIState:
     routine_active: bool = False
     active_routine_name: str | None = None
     verbose_controls: bool = False
+    instant_mode: bool = False
     sigint_pending: bool = False
     shutdown_requested: bool = False
     shutdown_finalized: bool = False
