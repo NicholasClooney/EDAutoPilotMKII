@@ -52,6 +52,7 @@ def _make_config(journal_dir: Path) -> AppConfig:
             mass_lock_boost_delay_seconds=5.0,
             market_nav_delay_seconds=0.1,
             market_trade_max_attempts=3,
+            market_buy_hold_seconds_per_ton=0.01,
             market_critical_level_multiplier=10.0,
             haul_post_sell_settle_seconds=2.0,
             haul_two_way_auto_hyperspace_engage=True,
@@ -438,7 +439,28 @@ class ControlRoomBindingsTests(unittest.TestCase):
         announce_fn = captured["kwargs"]["announce_fn"]
         self.assertIs(announce_fn.__self__, self.app)
         self.assertIs(announce_fn.__func__, self.app._announce_tts.__func__)
+        self.assertEqual(captured["kwargs"]["buy_hold_seconds_per_ton"], 0.01)
         self.assertEqual(captured["kwargs"]["critical_level_multiplier"], 10.0)
+
+    def test_buy_command_defaults_multi_word_item_to_max(self) -> None:
+        captured: dict[str, object] = {}
+
+        self.app._controls = object()
+        self.app._make_progress = lambda: (lambda _: None)
+        self.app._make_controls = lambda progress: object()
+        self.app._make_sleeper = lambda: (lambda _: None)
+        self.app._make_watcher = lambda: object()
+        self.app._run_in_thread = lambda fn: fn()
+
+        def fake_market_buy(controls, watcher, **kwargs):
+            captured["kwargs"] = kwargs
+            return None
+
+        with patch("edap.control_room.routines_trade.market_buy", new=fake_market_buy):
+            self.app._cmd_buy("food cartridges")
+
+        self.assertEqual(captured["kwargs"]["target"], "food cartridges")
+        self.assertEqual(captured["kwargs"]["amount"], "MAX")
 
     def test_escape_command_calls_mass_lock_routine(self) -> None:
         captured: dict[str, object] = {}
@@ -846,12 +868,53 @@ class ControlRoomDispatchTests(unittest.TestCase):
         history = self.app._saved_state.history
         return history[-1] if history else None
 
-    def test_unknown_verb_logs_warning_and_does_not_record_history(self) -> None:
+    def test_unknown_verb_logs_warning_and_records_history(self) -> None:
         self.app._dispatch_command("frobnicate now")
 
         output = "\n".join(self.app.logged)
         self.assertIn("Unknown command: frobnicate now", output)
-        self.assertEqual(self.app._saved_state.history, [])
+        entry = self._last_history()
+        self.assertIsNotNone(entry)
+        self.assertEqual(entry.command, "frobnicate")
+        self.assertEqual(entry.raw, "frobnicate now")
+        self.assertEqual(entry.params, {"value": "now"})
+
+    def test_invalid_buy_amount_records_history(self) -> None:
+        self.app._controls = object()
+        self.app._dispatch_command("buy aluminium 0")
+
+        output = "\n".join(self.app.logged)
+        self.assertIn("Invalid amount", output)
+        entry = self._last_history()
+        self.assertIsNotNone(entry)
+        self.assertEqual(entry.command, "buy")
+        self.assertEqual(entry.raw, "buy aluminium 0")
+        self.assertEqual(entry.params, {"target": "aluminium", "amount": None})
+
+    def test_buy_multi_word_item_records_full_target_and_defaults_to_max(self) -> None:
+        self.app._controls = object()
+        self.app._make_progress = lambda: (lambda _: None)
+        self.app._make_controls = lambda progress: object()
+        self.app._make_sleeper = lambda: (lambda _: None)
+        self.app._make_watcher = lambda: object()
+        self.app._run_in_thread = lambda fn: fn()
+
+        captured: dict[str, object] = {}
+
+        def fake_market_buy(controls, watcher, **kwargs):
+            captured["kwargs"] = kwargs
+            return None
+
+        with patch("edap.control_room.routines_trade.market_buy", new=fake_market_buy):
+            self.app._dispatch_command("buy food cartridges")
+
+        entry = self._last_history()
+        self.assertIsNotNone(entry)
+        self.assertEqual(entry.command, "buy")
+        self.assertEqual(entry.raw, "buy food cartridges")
+        self.assertEqual(entry.params, {"target": "food cartridges", "amount": "MAX"})
+        self.assertEqual(captured["kwargs"]["target"], "food cartridges")
+        self.assertEqual(captured["kwargs"]["amount"], "MAX")
 
     def test_verb_routing_is_case_insensitive(self) -> None:
         self.app._dispatch_command("HELP set_dest")

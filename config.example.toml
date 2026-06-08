@@ -31,6 +31,8 @@ mass_lock_boost_delay_seconds = 5.0
 market_nav_delay_seconds = 0.1
 # Maximum buy/sell attempts before aborting when the matching MarketBuy/MarketSell journal event is not observed.
 market_trade_max_attempts = 3
+# For `buy ... max`, hold UI_Right for `available cargo space * this factor`, capped by the routine max hold.
+market_buy_hold_seconds_per_ton = 0.01
 # Treat station supply/demand below this cargo-capacity multiplier as critically low for warning/TTS.
 market_critical_level_multiplier = 10.0
 # Settle pause after the two-way haul sell phase before the buy phase presses UI_Select.

@@ -49,6 +49,7 @@ class ControlsConfig:
     mass_lock_boost_delay_seconds: float
     market_nav_delay_seconds: float
     market_trade_max_attempts: int
+    market_buy_hold_seconds_per_ton: float
     market_critical_level_multiplier: float
     haul_post_sell_settle_seconds: float
     haul_two_way_auto_hyperspace_engage: bool
@@ -268,6 +269,10 @@ def validate_config(config: AppConfig) -> AppConfig:
         raise ConfigError("Config value `controls.market_nav_delay_seconds` must be non-negative.")
     if config.controls.market_trade_max_attempts < 1:
         raise ConfigError("Config value `controls.market_trade_max_attempts` must be at least 1.")
+    if config.controls.market_buy_hold_seconds_per_ton <= 0:
+        raise ConfigError(
+            "Config value `controls.market_buy_hold_seconds_per_ton` must be greater than 0."
+        )
     if config.controls.market_critical_level_multiplier <= 0:
         raise ConfigError("Config value `controls.market_critical_level_multiplier` must be greater than 0.")
     if config.controls.haul_post_sell_settle_seconds < 0:
@@ -375,6 +380,11 @@ def load_config(path: Path | str = DEFAULT_CONFIG_PATH) -> AppConfig:
             mass_lock_boost_delay_seconds=_float(controls, "mass_lock_boost_delay_seconds", 5.0),
             market_nav_delay_seconds=_float(controls, "market_nav_delay_seconds", 0.1),
             market_trade_max_attempts=_integer(controls, "market_trade_max_attempts", 3),
+            market_buy_hold_seconds_per_ton=_float(
+                controls,
+                "market_buy_hold_seconds_per_ton",
+                0.01,
+            ),
             market_critical_level_multiplier=_float(controls, "market_critical_level_multiplier", 10.0),
             haul_post_sell_settle_seconds=_float(controls, "haul_post_sell_settle_seconds", 2.0),
             haul_two_way_auto_hyperspace_engage=_boolean(controls, "haul_two_way_auto_hyperspace_engage", True),

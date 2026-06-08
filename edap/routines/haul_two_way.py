@@ -165,6 +165,7 @@ class _HaulCtx:
     station_2: StationLeg
     step_delay_s: float
     max_hold_s: float
+    market_buy_hold_seconds_per_ton: float
     dock_timeout_s: float
     request_timeout_s: float
     undock_timeout_s: float
@@ -364,6 +365,7 @@ def _run_market_sell(
         amount="MAX",
         step_delay_s=ctx.step_delay_s,
         max_hold_s=ctx.max_hold_s,
+        buy_hold_seconds_per_ton=ctx.market_buy_hold_seconds_per_ton,
         trade_timeout_s=ctx.trade_timeout_s,
         time_fn=ctx.time_fn,
         sleeper=ctx.sleeper,
@@ -678,6 +680,7 @@ def haul_loop_two_way(
     start_phase: Phase | None = None,
     step_delay_s: float = 1.0,
     max_hold_s: float = 10.0,
+    market_buy_hold_seconds_per_ton: float = 0.01,
     dock_timeout_s: float = 600.0,
     request_timeout_s: float = 20.0,
     undock_timeout_s: float = 30.0,
@@ -732,6 +735,7 @@ def haul_loop_two_way(
         ),
         step_delay_s=step_delay_s,
         max_hold_s=max_hold_s,
+        market_buy_hold_seconds_per_ton=market_buy_hold_seconds_per_ton,
         dock_timeout_s=dock_timeout_s,
         request_timeout_s=request_timeout_s,
         undock_timeout_s=undock_timeout_s,

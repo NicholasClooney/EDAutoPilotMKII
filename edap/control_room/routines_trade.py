@@ -23,6 +23,31 @@ def _parse_amount(s: str) -> int | str | None:
         return None
 
 
+def _parse_trade_target_and_amount(rest: str) -> tuple[str, int | str | None, bool]:
+    value = rest.strip()
+    if not value:
+        return "", None, False
+    parts = value.rsplit(None, 1)
+    if len(parts) == 1:
+        maybe_amount = _parse_amount(parts[0])
+        if maybe_amount is not None:
+            return "", None, True
+        return parts[0], "MAX", False
+    last_token = parts[1]
+    maybe_amount = _parse_amount(last_token)
+    if maybe_amount is None:
+        if last_token.upper() == "MAX":
+            return parts[0].strip(), None, True
+        try:
+            int(last_token)
+        except ValueError:
+            return value, "MAX", False
+        return parts[0].strip(), None, True
+    if not parts[0].strip():
+        return "", None, True
+    return parts[0].strip(), maybe_amount, True
+
+
 def _read_cargo_inventory(journal_dir: Path) -> list[dict[str, Any]]:
     cargo_path = journal_dir / "Cargo.json"
     try:
@@ -46,13 +71,23 @@ def _sellable_cargo(inventory: list[dict[str, Any]]) -> list[dict[str, Any]]:
 def cmd_buy(app: TradeHost, rest: str, *, skip_delay: bool = False) -> None:
     if not app._check_routine_ready():
         return
-    parts = rest.split(None, 1)
-    if not parts:
+    target, amount, _amount_supplied = _parse_trade_target_and_amount(rest)
+    if not target:
+        app._record_history_entry(CommandHistoryEntry(
+            raw=f"buy {rest}",
+            command="buy",
+            params={"target": "", "amount": None},
+            timestamp=now_iso(),
+        ))
         app._log("[red]Usage: buy <item> [amount|max][/]")
         return
-    target = parts[0]
-    amount = _parse_amount(parts[1].strip() if len(parts) > 1 else "MAX")
-    if amount is None:
+    if amount is None or not target:
+        app._record_history_entry(CommandHistoryEntry(
+            raw=f"buy {rest}",
+            command="buy",
+            params={"target": target, "amount": None},
+            timestamp=now_iso(),
+        ))
         app._log(f"[red]Invalid amount — use a positive integer or MAX[/]")
         return
     app._record_history_entry(CommandHistoryEntry(
@@ -72,6 +107,7 @@ def cmd_buy(app: TradeHost, rest: str, *, skip_delay: bool = False) -> None:
 
     amt_label = str(amount) + ("t" if isinstance(amount, int) else "")
     max_attempts = app._config.controls.market_trade_max_attempts
+    buy_hold_seconds_per_ton = app._config.controls.market_buy_hold_seconds_per_ton
     critical_level_multiplier = app._config.controls.market_critical_level_multiplier
     app._start_delayed_routine(
         description=f"buy {target}",
@@ -86,6 +122,7 @@ def cmd_buy(app: TradeHost, rest: str, *, skip_delay: bool = False) -> None:
             step_delay_s=step_delay,
             nav_delay_s=nav_delay,
             max_attempts=max_attempts,
+            buy_hold_seconds_per_ton=buy_hold_seconds_per_ton,
             sleeper=sleeper,
             progress_fn=progress,
             announce_fn=app._announce_tts,
@@ -98,10 +135,23 @@ def cmd_sell(app: TradeHost, rest: str, *, skip_delay: bool = False) -> None:
     if not app._check_routine_ready():
         return
     if rest:
-        parts = rest.split(None, 1)
-        target = parts[0]
-        amount = _parse_amount(parts[1].strip() if len(parts) > 1 else "MAX")
-        if amount is None:
+        target, amount, _amount_supplied = _parse_trade_target_and_amount(rest)
+        if not target:
+            app._record_history_entry(CommandHistoryEntry(
+                raw=f"sell {rest}",
+                command="sell",
+                params={"target": "", "amount": None},
+                timestamp=now_iso(),
+            ))
+            app._log("[red]Usage: sell <item> [amount|max][/]")
+            return
+        if amount is None or not target:
+            app._record_history_entry(CommandHistoryEntry(
+                raw=f"sell {rest}",
+                command="sell",
+                params={"target": target, "amount": None},
+                timestamp=now_iso(),
+            ))
             app._log("[red]Invalid amount — use a positive integer or MAX[/]")
             return
         app._record_history_entry(CommandHistoryEntry(
@@ -132,6 +182,7 @@ def sell_item(app: TradeHost, target: str, amount: int | str, *, skip_delay: boo
 
     amt_label = str(amount) + ("t" if isinstance(amount, int) else "")
     max_attempts = app._config.controls.market_trade_max_attempts
+    buy_hold_seconds_per_ton = app._config.controls.market_buy_hold_seconds_per_ton
     critical_level_multiplier = app._config.controls.market_critical_level_multiplier
     app._start_delayed_routine(
         description=f"sell {target}",
@@ -145,6 +196,7 @@ def sell_item(app: TradeHost, target: str, amount: int | str, *, skip_delay: boo
             step_delay_s=step_delay,
             nav_delay_s=nav_delay,
             max_attempts=max_attempts,
+            buy_hold_seconds_per_ton=buy_hold_seconds_per_ton,
             sleeper=sleeper,
             progress_fn=progress,
             announce_fn=app._announce_tts,
@@ -175,6 +227,7 @@ def sell_all(app: TradeHost, *, skip_delay: bool = False) -> None:
     if used_fallback:
         app._log("[yellow]Cargo journal state was empty; using Cargo.json fallback for sell-all[/]")
     max_attempts = app._config.controls.market_trade_max_attempts
+    buy_hold_seconds_per_ton = app._config.controls.market_buy_hold_seconds_per_ton
     critical_level_multiplier = app._config.controls.market_critical_level_multiplier
 
     def run_all() -> None:
@@ -191,6 +244,7 @@ def sell_all(app: TradeHost, *, skip_delay: bool = False) -> None:
                     step_delay_s=step_delay,
                     nav_delay_s=nav_delay,
                     max_attempts=max_attempts,
+                    buy_hold_seconds_per_ton=buy_hold_seconds_per_ton,
                     sleeper=sleeper,
                     progress_fn=progress,
                     announce_fn=app._announce_tts,

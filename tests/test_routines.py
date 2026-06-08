@@ -679,6 +679,129 @@ class RoutinesTests(unittest.TestCase):
             progress,
         )
 
+    def test_market_buy_max_scales_hold_time_from_available_cargo_space(self) -> None:
+        controls = FakeShipControls()
+        watcher = FakeWatcher(
+            [[{"event": "MarketBuy", "Type": "aluminium", "Type_Localised": "Aluminium", "Count": 46, "TotalCost": 1234}]]
+        )
+        progress: list[str] = []
+
+        with tempfile.TemporaryDirectory() as tmp:
+            journal_dir = Path(tmp)
+            (journal_dir / "Journal.240101000000.01.log").write_text(
+                "\n".join([
+                    json.dumps({
+                        "timestamp": "2024-01-01T00:00:00Z",
+                        "event": "Location",
+                        "Docked": True,
+                        "StationName": "Pawelczyk Dock",
+                    }),
+                    json.dumps({
+                        "timestamp": "2024-01-01T00:00:01Z",
+                        "event": "Loadout",
+                        "CargoCapacity": 512,
+                    }),
+                ]) + "\n",
+                encoding="utf-8",
+            )
+            (journal_dir / "Cargo.json").write_text(
+                json.dumps(
+                    {
+                        "Inventory": [
+                            {"Name": "gold", "Count": 52},
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            market_path = journal_dir / "Market.json"
+            market_path.write_text(
+                json.dumps(
+                    {
+                        "StationName": "Pawelczyk Dock",
+                        "Items": [
+                            {"Category": "Metals", "Name": "aluminium", "Stock": 1000},
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            result = market_buy(
+                controls,
+                watcher,
+                market_path=market_path,
+                target="aluminium",
+                amount="MAX",
+                step_delay_s=0.0,
+                nav_delay_s=0.0,
+                buy_hold_seconds_per_ton=0.01,
+                trade_timeout_s=30.0,
+                time_fn=lambda: 0.0,
+                sleeper=lambda _: None,
+                progress_fn=progress.append,
+            )
+
+        self.assertEqual(result.dispatch.status, "ok")
+        hold_calls = [call for call in controls.calls if call["action"] == "UI_Right" and call["hold_s"]]
+        self.assertEqual(len(hold_calls), 1)
+        self.assertAlmostEqual(float(hold_calls[0]["hold_s"]), 4.6)
+        self.assertIn("  UI_Right hold 4.60s (fill to max from 460t free at 0.0100s/t)", progress)
+
+    def test_market_buy_max_falls_back_to_cap_when_available_cargo_space_is_unknown(self) -> None:
+        controls = FakeShipControls()
+        watcher = FakeWatcher(
+            [[{"event": "MarketBuy", "Type": "aluminium", "Type_Localised": "Aluminium", "Count": 46, "TotalCost": 1234}]]
+        )
+        progress: list[str] = []
+
+        with tempfile.TemporaryDirectory() as tmp:
+            journal_dir = Path(tmp)
+            (journal_dir / "Journal.240101000000.01.log").write_text(
+                json.dumps({
+                    "timestamp": "2024-01-01T00:00:01Z",
+                    "event": "Loadout",
+                    "CargoCapacity": 512,
+                }) + "\n",
+                encoding="utf-8",
+            )
+            market_path = journal_dir / "Market.json"
+            market_path.write_text(
+                json.dumps(
+                    {
+                        "StationName": "Pawelczyk Dock",
+                        "Items": [
+                            {"Category": "Metals", "Name": "aluminium", "Stock": 1000},
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            result = market_buy(
+                controls,
+                watcher,
+                market_path=market_path,
+                target="aluminium",
+                amount="MAX",
+                step_delay_s=0.0,
+                nav_delay_s=0.0,
+                max_hold_s=10.0,
+                buy_hold_seconds_per_ton=0.01,
+                trade_timeout_s=30.0,
+                skip_station_check=True,
+                time_fn=lambda: 0.0,
+                sleeper=lambda _: None,
+                progress_fn=progress.append,
+            )
+
+        self.assertEqual(result.dispatch.status, "ok")
+        self.assertIn({"action": "UI_Right", "repeat": 1, "hold_s": 10.0}, controls.calls)
+        self.assertIn(
+            "  UI_Right hold 10.00s (fill to max; cargo space unavailable, using cap)",
+            progress,
+        )
+
     def test_market_buy_rejects_when_no_docked_station_state_exists(self) -> None:
         controls = FakeShipControls()
         watcher = FakeWatcher([])

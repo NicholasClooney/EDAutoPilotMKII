@@ -80,6 +80,14 @@ def dispatch(app: CommandHost, raw: str, *, skip_delay_override: bool | None = N
     elif verb == "reload":
         app._cmd_reload()
     else:
+        app._record_history_entry(
+            CommandHistoryEntry(
+                raw=raw,
+                command=verb,
+                params={"value": raw_rest} if raw_rest else {},
+                timestamp=now_iso(),
+            )
+        )
         app._log(f"[dim]Unknown command: {escape(raw)}[/]")
 
 

@@ -107,6 +107,30 @@ def _read_last_cargo_capacity(journal_dir: Path) -> int | None:
     return None
 
 
+def _read_available_cargo_space(journal_dir: Path) -> int | None:
+    cargo_capacity = _read_last_cargo_capacity(journal_dir)
+    if cargo_capacity is None or cargo_capacity <= 0:
+        return None
+    cargo_path = journal_dir / "Cargo.json"
+    try:
+        with cargo_path.open(encoding="utf-8") as handle:
+            cargo_data = json.load(handle)
+    except (OSError, json.JSONDecodeError):
+        return None
+    inventory = cargo_data.get("Inventory", [])
+    if not isinstance(inventory, list):
+        return None
+    used_capacity = 0
+    for item in inventory:
+        if not isinstance(item, dict):
+            return None
+        count = item.get("Count", 0)
+        if isinstance(count, bool) or not isinstance(count, (int, float)):
+            return None
+        used_capacity += int(count)
+    return max(0, cargo_capacity - used_capacity)
+
+
 def _find_market_item(items: list[dict], target: str, side: str) -> dict | None:
     target_lower = target.lower()
     for item in items:
@@ -184,6 +208,7 @@ def market_buy(
     step_delay_s: float = 1.0,
     nav_delay_s: float = 0.1,
     max_hold_s: float = 10.0,
+    buy_hold_seconds_per_ton: float = 0.01,
     trade_timeout_s: float = 30.0,
     skip_station_check: bool = False,
     max_attempts: int = 3,
@@ -197,6 +222,7 @@ def market_buy(
         controls, watcher,
         market_path=market_path, target=target, amount=amount, side="buy",
         step_delay_s=step_delay_s, nav_delay_s=nav_delay_s, max_hold_s=max_hold_s,
+        buy_hold_seconds_per_ton=buy_hold_seconds_per_ton,
         trade_timeout_s=trade_timeout_s, skip_station_check=skip_station_check,
         max_attempts=max_attempts,
         time_fn=time_fn, sleeper=sleeper, progress_fn=progress_fn, announce_fn=announce_fn,
@@ -214,6 +240,7 @@ def market_sell(
     step_delay_s: float = 1.0,
     nav_delay_s: float = 0.1,
     max_hold_s: float = 10.0,
+    buy_hold_seconds_per_ton: float = 0.01,
     trade_timeout_s: float = 30.0,
     skip_station_check: bool = False,
     max_attempts: int = 3,
@@ -227,6 +254,7 @@ def market_sell(
         controls, watcher,
         market_path=market_path, target=target, amount=amount, side="sell",
         step_delay_s=step_delay_s, nav_delay_s=nav_delay_s, max_hold_s=max_hold_s,
+        buy_hold_seconds_per_ton=buy_hold_seconds_per_ton,
         trade_timeout_s=trade_timeout_s, skip_station_check=skip_station_check,
         max_attempts=max_attempts,
         time_fn=time_fn, sleeper=sleeper, progress_fn=progress_fn, announce_fn=announce_fn,
@@ -245,6 +273,7 @@ def _market_trade(
     step_delay_s: float,
     nav_delay_s: float,
     max_hold_s: float,
+    buy_hold_seconds_per_ton: float,
     trade_timeout_s: float,
     skip_station_check: bool,
     max_attempts: int,
@@ -277,6 +306,7 @@ def _market_trade(
             market_path=market_path, target=target, amount=amount, side=side,
             event_type=event_type,
             step_delay_s=step_delay_s, nav_delay_s=nav_delay_s, max_hold_s=max_hold_s,
+            buy_hold_seconds_per_ton=buy_hold_seconds_per_ton,
             trade_timeout_s=trade_timeout_s, skip_station_check=skip_station_check,
             time_fn=time_fn, sleeper=sleeper, progress_fn=progress_fn, announce_fn=announce_fn,
             critical_level_multiplier=critical_level_multiplier,
@@ -315,6 +345,7 @@ def _market_trade_attempt(
     step_delay_s: float,
     nav_delay_s: float,
     max_hold_s: float,
+    buy_hold_seconds_per_ton: float,
     trade_timeout_s: float,
     skip_station_check: bool,
     time_fn: Callable[[], float],
@@ -473,9 +504,21 @@ def _market_trade_attempt(
     # Set quantity -- sell pre-fills with full cargo amount so no input needed
     if side == "buy":
         if amount == "MAX":
+            hold_s = max_hold_s
+            available_space = _read_available_cargo_space(market_path.parent)
+            if available_space is not None:
+                hold_s = min(max_hold_s, available_space * buy_hold_seconds_per_ton)
             if progress_fn is not None:
-                progress_fn(f"  UI_Right hold {max_hold_s:.0f}s (fill to max)")
-            qty_dispatch = controls.ui_right(hold_s=max_hold_s)
+                if available_space is None:
+                    progress_fn(
+                        f"  UI_Right hold {hold_s:.2f}s (fill to max; cargo space unavailable, using cap)"
+                    )
+                else:
+                    progress_fn(
+                        f"  UI_Right hold {hold_s:.2f}s "
+                        f"(fill to max from {available_space}t free at {buy_hold_seconds_per_ton:.4f}s/t)"
+                    )
+            qty_dispatch = controls.ui_right(hold_s=hold_s)
             if qty_dispatch.status != "ok":
                 return RoutineResult(action="UI_Right", dispatch=qty_dispatch, details={"phase": "set_quantity"})
         else:
