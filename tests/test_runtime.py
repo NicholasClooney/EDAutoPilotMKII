@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 from edap.config import DEFAULT_CONFIG_PATH, load_config
 from edap.runtime import build_runtime_context, load_config_with_fallback
+from edap.platform.input.windows import WindowsInputController
 
 
 class _FakeGamePaths:
@@ -177,3 +178,30 @@ bindings_file = "{missing_bindings}"
         self.assertEqual(runtime.bindings.effective["status"], "missing")
         self.assertEqual(runtime.bindings.cli_source_status(), "configured_missing")
         self.assertIsNone(runtime.binding_lookup)
+
+    def test_build_runtime_context_builds_windows_input_controller(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            config_path = temp_root / "config.toml"
+            config_path.write_text(
+                """
+[paths]
+
+[controls]
+
+[screen]
+
+[runtime]
+platform = "windows"
+""".strip(),
+                encoding="utf-8",
+            )
+            config = load_config(config_path)
+
+            with patch("edap.runtime.build_game_paths", return_value=None), patch(
+                "edap.runtime.build_screen_capture",
+                return_value=None,
+            ):
+                runtime = build_runtime_context(config)
+
+        self.assertIsInstance(runtime.input_controller, WindowsInputController)

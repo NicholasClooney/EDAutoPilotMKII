@@ -2,7 +2,7 @@
 
 _This is the maintained status document for the repo. Update it at the end of each session when project understanding, port status, or next steps change. Keep it current over time rather than treating it as a frozen checkpoint._
 
-Last updated: 2026-06-07 (session 46)
+Last updated: 2026-06-08 (session 47)
 
 ## Where We Are
 
@@ -61,6 +61,8 @@ Latest live validation on the current macOS + CrossOver setup:
 - Control-room startup bootstrap now also reads `Status.json`, so current balance and cargo count appear immediately on launch instead of waiting for a later journal event carrying `Credits` / cargo data.
 - Ship-status rendering is now two-column: navigation/flight state on the left, finance/cargo summary on the right. The right column includes balance, total cargo, and up to three top cargo stacks from `Cargo.json` / live cargo state, sorted by quantity.
 - Haul-panel elapsed time now starts immediately when `haul` is launched, including resume-started sessions. Resumed partial runs still do not contribute to completed-run averages or accumulated per-run stats until a clean sell-station departure / return cycle is observed.
+- Windows support scope is now explicitly narrowed: screen capture is still not a current Windows target, but Windows input + control-room command execution are now active follow-up work. A new `WindowsInputController` exists under `edap/platform/input/windows.py`, the runtime input factory now returns it for `runtime.platform = "windows"`, and focused tests cover Windows key translation / modifier sequencing plus runtime construction. This is implementation coverage, not yet live validation on a real Windows Elite session.
+- Platform factories are now lazy-imported (`edap/platform/input/factory.py`, `edap/platform/screen/factory.py`, `edap/platform/paths/factory.py`) so Windows and Linux clients do not import macOS backend modules just by constructing runtime helpers. That keeps optional platform dependencies isolated behind `runtime.platform` instead of module import order.
 
 The important caveat is that the real autopilot loop is still largely unported. The project is in a portability-first and runtime-seams phase, not a "macOS autopilot feature complete" phase.
 
@@ -80,6 +82,7 @@ Repo cleanup / positioning pass from plan 0006 is now applied:
 | Bindings XML parsing | Done | `edap/bindings.py`, `edap/binding_lookup.py` |
 | Action dispatch | Done | `edap/actions.py`, `edap/ship_controls.py` — 0.1s dwell floor, 0.2s continuous default |
 | macOS input backend | Done | `edap/platform/input/macos.py` — Quartz CGEvent, modifier combos work; modifier key is now explicitly pressed/released to prevent flag bleed-through to subsequent keypresses |
+| Windows input backend | Done (not live-validated) | `edap/platform/input/windows.py` — scan-code `SendInput` backend restored behind the shared `InputController` interface; covers tap/press/release/type_text with modifier sequencing and powers Windows `ship_controls.py` / `run_routine.py` / control-room command dispatch once journal and bindings paths resolve |
 | Screen capture (one-shot) | Done | `edap/platform/screen/macos.py`, `edap/capture.py` — normalized regions |
 | Config loading | Done | `edap/config.py`, `config.example.toml` |
 | Runtime context assembly | Done | `edap/runtime.py` — config fallback, path resolution, optional binding lookup, platform adapter wiring |
@@ -108,6 +111,7 @@ Repo cleanup / positioning pass from plan 0006 is now applied:
 - **Real-time capture loop.** Only ever captured a single frame. Frame rate and capture cost in a continuous loop are unmeasured.
 - **Journal write latency vs poll rate.** We have not measured how quickly Elite (through CrossOver) flushes events to disk relative to a 0.5s poll.
 - **Window focus during autopilot.** `CGEventPost` is global on macOS; behavior across focus loss and multi-monitor setups during a live run is untested.
+- **Windows live validation.** The new Windows input backend is unit-tested only. We have not yet validated `diagnostics.py --send-test-key`, `ship_controls.py`, `run_routine.py`, or control-room routine dispatch on a real Windows Elite session. Windows screen capture remains intentionally unsupported for now.
 
 Full detail: `docs/research/0004-legacy-autopilot-port-status.md`.
 
@@ -134,6 +138,7 @@ These are not scheduled yet but worth capturing for planning.
 - **Monitoring and command center CLI.** Implemented in `control_room.py` (Textual TUI, `textual>=0.60` added to `pyproject.toml`). Three panels: SHIP STATUS (commander, system, station, flight status, fuel bar, credits, cargo fill, FSD target — bootstrapped from journal on startup, updated live), ACTIVITY (timestamped one-liners for jumps, docks, trades, missions, refuels — historical events suppressed), MARKET (current station from `Market.json`, auto-reloads on mtime change). Routine dispatch from the input bar: `dock`, `undock`, `jump`, `buy <item> [N]`, `sell`, `sell <item> [N]`, `haul [commodity]`, `dest <system>` / `set_dest <system>`. Market filter: `market filter <name>` (title-cased); `market` / `market clear` clears; `market lock/unlock`. Command history via up/down arrows. Ctrl-C/Ctrl-D cancel the active routine if one is running; when idle they exit the app. Input auto-focused on launch. Haul sell station defaults to current docked station. Live-validated for routine cancel vs idle exit behavior.
 - **Control room persistence follow-up.** Local JSON-backed operator state and the `replay` browser are now implemented in `control_room.py`. Next live check: verify the inline activity-pane UX, Enter-to-execute path, `e` edit path, and `*` explicit-default-haul path in the real `uv run python3 control_room.py` loop against Elite + CrossOver.
 - **Control room refactor follow-up.** The major heavy ownership blocks have now been extracted from `edap/control_room/app.py`, and the remaining command/routine modules depend on explicit host protocols instead of the concrete app class name. The compatibility wrapper surface is centralized in `facade.py`, and mutable prompt/history/replay/routine flags are internally grouped into state dataclasses. Remaining work, if we keep going, is to narrow the host protocols further so helper modules depend on those grouped state objects or smaller service seams instead of broad app mutation.
+- **Windows operator path.** Next Windows-focused validation slice is input-driven, not capture-driven: 1) validate `diagnostics.py --send-test-key` on a real Windows machine, 2) validate `ship_controls.py` against a live `.binds` file, 3) validate control-room routine commands (`dock`, `undock`, `buy`, `sell`, `jump`, `dest`, `haul`) now that runtime input is no longer macOS-only.
 
 ## Control Room Refactor TODOs
 

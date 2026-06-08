@@ -3,19 +3,32 @@ from __future__ import annotations
 from collections.abc import Callable
 from time import sleep as _default_sleep
 
-from Quartz import (
-    CGEventCreateKeyboardEvent,
-    CGEventKeyboardSetUnicodeString,
-    CGEventPost,
-    CGEventSetFlags,
-    CGEventSourceCreate,
-    kCGEventFlagMaskAlternate,
-    kCGEventFlagMaskCommand,
-    kCGEventFlagMaskControl,
-    kCGEventFlagMaskShift,
-    kCGEventSourceStateHIDSystemState,
-    kCGHIDEventTap,
-)
+try:
+    from Quartz import (
+        CGEventCreateKeyboardEvent,
+        CGEventKeyboardSetUnicodeString,
+        CGEventPost,
+        CGEventSetFlags,
+        CGEventSourceCreate,
+        kCGEventFlagMaskAlternate,
+        kCGEventFlagMaskCommand,
+        kCGEventFlagMaskControl,
+        kCGEventFlagMaskShift,
+        kCGEventSourceStateHIDSystemState,
+        kCGHIDEventTap,
+    )
+except ImportError:  # pragma: no cover - exercised implicitly on non-macOS CI runners
+    CGEventCreateKeyboardEvent = None
+    CGEventKeyboardSetUnicodeString = None
+    CGEventPost = None
+    CGEventSetFlags = None
+    CGEventSourceCreate = None
+    kCGEventFlagMaskAlternate = 1 << 19
+    kCGEventFlagMaskCommand = 1 << 20
+    kCGEventFlagMaskControl = 1 << 18
+    kCGEventFlagMaskShift = 1 << 17
+    kCGEventSourceStateHIDSystemState = None
+    kCGHIDEventTap = None
 
 from .base import InputController
 
@@ -113,13 +126,15 @@ SleeperFn = Callable[[float], None]
 
 
 def _make_default_poster() -> PosterFn:
+    if CGEventSourceCreate is None or CGEventCreateKeyboardEvent is None or CGEventPost is None:
+        raise RuntimeError("Quartz is required for the default macOS input backend.")
     source = CGEventSourceCreate(kCGEventSourceStateHIDSystemState)
 
     def poster(keycode: int, down: bool, flags: int, unicode_char: str | None) -> None:
         event = CGEventCreateKeyboardEvent(source, keycode, down)
-        if flags:
+        if flags and CGEventSetFlags is not None:
             CGEventSetFlags(event, flags)
-        if unicode_char is not None:
+        if unicode_char is not None and CGEventKeyboardSetUnicodeString is not None:
             CGEventKeyboardSetUnicodeString(event, 1, unicode_char)
         CGEventPost(kCGHIDEventTap, event)
 
