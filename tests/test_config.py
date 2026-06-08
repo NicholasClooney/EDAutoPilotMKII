@@ -100,11 +100,13 @@ class LoadConfigTests(unittest.TestCase):
     def test_default_runtime_platform_maps_supported_hosts(self) -> None:
         with patch("edap.config.sys.platform", "darwin"):
             self.assertEqual(default_runtime_platform(), "macos")
+        with patch("edap.config.sys.platform", "linux"):
+            self.assertEqual(default_runtime_platform(), "linux")
         with patch("edap.config.sys.platform", "win32"):
             self.assertEqual(default_runtime_platform(), "windows")
 
     def test_default_runtime_platform_rejects_unsupported_host(self) -> None:
-        with patch("edap.config.sys.platform", "linux"):
+        with patch("edap.config.sys.platform", "freebsd13"):
             with self.assertRaisesRegex(ConfigError, "runtime.platform"):
                 default_runtime_platform()
 
@@ -248,7 +250,7 @@ bottom = 0.9
 [screen]
 
 [runtime]
-platform = "linux"
+platform = "plan9"
 """.strip(),
             )
 

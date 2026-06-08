@@ -45,6 +45,17 @@ pip install -r requirements.txt
 7. Set `paths.journal_dir` and `paths.bindings_file` explicitly.
 8. Start Elite Dangerous.
 
+### Linux
+
+1. Install Python 3.12 and `uv`.
+2. Install `xdotool` if you want synthetic key input support.
+3. Copy `config.example.toml` to `config.toml`.
+4. Leave `runtime.platform` unset unless you want to make the backend choice explicit in a shared config. When omitted, it defaults to the host OS.
+5. Prefer explicit `paths.journal_dir` and `paths.bindings_file`, though the runtime now also probes common Steam Proton paths for app ID `359320`.
+6. Start Elite Dangerous through Steam/Proton.
+
+Linux input is currently implemented through `xdotool`, so treat it as X11-oriented and verify it locally before relying on routines. Wayland behavior is unverified.
+
 ## First Checks
 
 On macOS:
@@ -69,7 +80,15 @@ python diagnostics.py --config config.toml --send-test-key
 python ship_controls.py --config config.toml --action SetSpeedZero --delay-seconds 3
 ```
 
+On Linux:
+
+```sh
+uv run python3 diagnostics.py --config config.toml --send-test-key
+uv run python3 ship_controls.py --config config.toml --action SetSpeedZero --delay-seconds 3
+```
+
 Validate `diagnostics.py --send-test-key` first on Windows. That proves the `SendInput` path reaches Elite before you debug bindings or routines.
+Validate `diagnostics.py --send-test-key` first on Linux too. That proves the `xdotool` path reaches the game before you debug bindings or routines.
 
 ## Main Runtime
 
@@ -86,6 +105,12 @@ uv run python control_room.py --config config.toml
 python control_room.py --config config.toml
 ```
 
+Linux equivalent:
+
+```sh
+uv run python3 control_room.py --config config.toml
+```
+
 ## Routine Harness
 
 ```sh
@@ -99,6 +124,12 @@ Windows equivalents:
 ```sh
 uv run python run_routine.py --config config.toml --routine jump --delay-seconds 5
 python run_routine.py --config config.toml --routine jump --delay-seconds 5
+```
+
+Linux equivalent:
+
+```sh
+uv run python3 run_routine.py --config config.toml --routine jump --delay-seconds 5
 ```
 
 For current supported manual validation flows, see [../operators/manual-journal-routine-testing.md](../operators/manual-journal-routine-testing.md).

@@ -68,6 +68,8 @@ Latest live validation on the current macOS + CrossOver setup:
 - `docs/getting-started/quickstart.md` now documents both macOS + CrossOver setup and Windows setup paths (with `uv` and without it), including the recommended first Windows validation step: `diagnostics.py --send-test-key` before control-room or routine debugging.
 - `runtime.platform` is no longer mandatory for normal macOS/Windows use. `edap/config.py` now defaults it from the host OS when omitted (`darwin -> macos`, `win* -> windows`) while still allowing an explicit override in config. Unsupported hosts still fail fast unless `runtime.platform` is set explicitly.
 - `README.md` top-line positioning now reflects the current state more accurately: the project is still macOS-first, but Windows input/control-room support is no longer just a future constraint item.
+- Linux is now a supported runtime target in config/runtime/test/CI scope. `edap/config.py` accepts `runtime.platform = "linux"` (and defaults to it on Linux hosts), `edap/platform/paths/linux.py` probes common Steam Proton `compatdata/359320` journal + bindings locations, and `edap/platform/input/linux.py` provides an optional `xdotool`-based `InputController` backend. This is intended as an explicit/X11-oriented starting point, not a Wayland guarantee.
+- GitHub Actions CI now exists under `.github/workflows/tests.yml` and runs `uv run python -m unittest discover -s tests` on `ubuntu-latest`, `macos-latest`, and `windows-latest`. That gives cross-platform regression coverage for binding lookup, platform factories, input-controller seam tests, control-room tests, and the rest of the local unittest suite.
 
 The important caveat is that the real autopilot loop is still largely unported. The project is in a portability-first and runtime-seams phase, not a "macOS autopilot feature complete" phase.
 
@@ -88,6 +90,7 @@ Repo cleanup / positioning pass from plan 0006 is now applied:
 | Action dispatch | Done | `edap/actions.py`, `edap/ship_controls.py` — 0.1s dwell floor, 0.2s continuous default |
 | macOS input backend | Done | `edap/platform/input/macos.py` — Quartz CGEvent, modifier combos work; modifier key is now explicitly pressed/released to prevent flag bleed-through to subsequent keypresses |
 | Windows input backend | Done (not live-validated) | `edap/platform/input/windows.py` — scan-code `SendInput` backend restored behind the shared `InputController` interface; covers tap/press/release/type_text with modifier sequencing and powers Windows `ship_controls.py` / `run_routine.py` / control-room command dispatch once journal and bindings paths resolve |
+| Linux input backend | Done (not live-validated) | `edap/platform/input/linux.py` — `xdotool` backend behind the shared `InputController` interface; intended for explicit Linux/Proton validation, with current documentation treating it as X11-oriented and unverified on Wayland |
 | Screen capture (one-shot) | Done | `edap/platform/screen/macos.py`, `edap/capture.py` — normalized regions |
 | Config loading | Done | `edap/config.py`, `config.example.toml` |
 | Runtime context assembly | Done | `edap/runtime.py` — config fallback, path resolution, optional binding lookup, platform adapter wiring |
@@ -117,6 +120,7 @@ Repo cleanup / positioning pass from plan 0006 is now applied:
 - **Journal write latency vs poll rate.** We have not measured how quickly Elite (through CrossOver) flushes events to disk relative to a 0.5s poll.
 - **Window focus during autopilot.** `CGEventPost` is global on macOS; behavior across focus loss and multi-monitor setups during a live run is untested.
 - **Windows live validation.** The new Windows input backend is unit-tested only. We have not yet validated `diagnostics.py --send-test-key`, `ship_controls.py`, `run_routine.py`, or control-room routine dispatch on a real Windows Elite session. Windows screen capture remains intentionally unsupported for now.
+- **Linux live validation.** The new Linux backend is covered by unit tests and CI only. We have not yet validated `diagnostics.py --send-test-key`, `ship_controls.py`, `run_routine.py`, or control-room routine dispatch on a real Linux + Proton Elite session, and Wayland behavior is explicitly unverified.
 
 Full detail: `docs/research/0004-legacy-autopilot-port-status.md`.
 
@@ -144,6 +148,7 @@ These are not scheduled yet but worth capturing for planning.
 - **Control room persistence follow-up.** Local JSON-backed operator state and the `replay` browser are now implemented in `control_room.py`. Next live check: verify the inline activity-pane UX, Enter-to-execute path, `e` edit path, and `*` explicit-default-haul path in the real `uv run python3 control_room.py` loop against Elite + CrossOver.
 - **Control room refactor follow-up.** The major heavy ownership blocks have now been extracted from `edap/control_room/app.py`, and the remaining command/routine modules depend on explicit host protocols instead of the concrete app class name. The compatibility wrapper surface is centralized in `facade.py`, and mutable prompt/history/replay/routine flags are internally grouped into state dataclasses. Remaining work, if we keep going, is to narrow the host protocols further so helper modules depend on those grouped state objects or smaller service seams instead of broad app mutation.
 - **Windows operator path.** Next Windows-focused validation slice is input-driven, not capture-driven: 1) validate `diagnostics.py --send-test-key` on a real Windows machine, 2) validate `ship_controls.py` against a live `.binds` file, 3) validate control-room routine commands (`dock`, `undock`, `buy`, `sell`, `jump`, `dest`, `haul`) now that runtime input is no longer macOS-only.
+- **Linux operator path.** Next Linux-focused validation slice mirrors Windows: 1) validate `diagnostics.py --send-test-key` on a real Linux X11/Proton setup, 2) validate `ship_controls.py` against a live `.binds` file, 3) validate control-room and routine command dispatch. If `xdotool` proves insufficient on the target setup, document the failure mode and decide whether a different backend such as `ydotool` is worth introducing.
 
 ## Control Room Refactor TODOs
 

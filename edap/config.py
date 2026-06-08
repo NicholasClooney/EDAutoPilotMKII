@@ -9,18 +9,20 @@ import tomllib
 DEFAULT_CONFIG_PATH = Path("config.toml")
 EXAMPLE_CONFIG_PATH = Path("config.example.toml")
 
-VALID_PLATFORMS = {"macos", "windows"}
+VALID_PLATFORMS = {"linux", "macos", "windows"}
 VALID_CAPTURE_MODES = {"fullscreen", "region"}
 
 
 def default_runtime_platform() -> str:
     if sys.platform == "darwin":
         return "macos"
+    if sys.platform.startswith("linux"):
+        return "linux"
     if sys.platform.startswith("win"):
         return "windows"
     raise ConfigError(
         "Config value `runtime.platform` must be set explicitly on this host. "
-        "Supported runtime values are: macos, windows."
+        "Supported runtime values are: linux, macos, windows."
     )
 
 

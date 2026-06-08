@@ -9,6 +9,10 @@ def build_input_controller(platform_name: str) -> InputController | None:
         from .macos import MacOSInputController
 
         return MacOSInputController()
+    if normalized == "linux":
+        from .linux import LinuxInputController
+
+        return LinuxInputController()
     if normalized == "windows":
         from .windows import WindowsInputController
 
