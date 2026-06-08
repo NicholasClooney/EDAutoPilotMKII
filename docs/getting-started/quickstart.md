@@ -90,6 +90,8 @@ uv run python3 ship_controls.py --config config.toml --action SetSpeedZero --del
 Validate `diagnostics.py --send-test-key` first on Windows. That proves the `SendInput` path reaches Elite before you debug bindings or routines.
 Validate `diagnostics.py --send-test-key` first on Linux too. That proves the `xdotool` path reaches the game before you debug bindings or routines.
 
+`diagnostics.py --send-test-key` only checks raw synthetic input delivery for a literal key such as `space` or `j`. It does not validate Elite action lookup from the bindings file. After that low-level check passes, use `check_bindings.py` to verify action resolution and `ship_controls.py --action ...` to verify a resolved Elite action in game.
+
 ## Main Runtime
 
 ```sh

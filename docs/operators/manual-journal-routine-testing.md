@@ -57,10 +57,18 @@ If you are unsure about the runtime prerequisites, verify them first with:
 ```sh
 uv run python3 watch_journal.py
 uv run python3 diagnostics.py --config config.toml
+uv run python3 diagnostics.py --config config.toml --send-test-key --test-key space --delay-seconds 3
+uv run python3 check_bindings.py
 uv run python3 ship_controls.py --config config.toml --action SetSpeedZero --delay-seconds 3
 ```
 
 `watch_journal.py` prints only a small filtered event set to stdout and writes every raw event to `artifacts/journal-watcher.log`, which is useful when you want to confirm event sequences before testing a routine.
+
+The distinction matters:
+
+- `diagnostics.py --send-test-key` proves only that the active platform backend can inject a literal keypress.
+- `check_bindings.py` proves that required Elite actions resolve from the current `.binds` file.
+- `ship_controls.py --action SetSpeedZero` proves the combined path: binding lookup plus live input dispatch for that Elite action.
 
 ## Manual Test Flow: Arrival Throttle Zero
 
