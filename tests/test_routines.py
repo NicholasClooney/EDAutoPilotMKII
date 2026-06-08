@@ -617,13 +617,24 @@ class RoutinesTests(unittest.TestCase):
 
         self.assertEqual(result.dispatch.status, "ok")
         self.assertEqual(
-            [controls.calls[0], controls.calls[-1]],
+            controls.calls[:4],
             [
-                {"action": "UI_Back", "repeat": 4, "hold_s": 0.0},
-                {"action": "UI_Back", "repeat": 4, "hold_s": 0.0},
+                {"action": "UI_Back", "repeat": 1, "hold_s": 0.0},
+                {"action": "UI_Back", "repeat": 1, "hold_s": 0.0},
+                {"action": "UI_Back", "repeat": 1, "hold_s": 0.0},
+                {"action": "UI_Back", "repeat": 1, "hold_s": 0.0},
             ],
         )
-        self.assertGreaterEqual(sleep_calls.count(0.5), 3)
+        self.assertEqual(
+            controls.calls[-4:],
+            [
+                {"action": "UI_Back", "repeat": 1, "hold_s": 0.0},
+                {"action": "UI_Back", "repeat": 1, "hold_s": 0.0},
+                {"action": "UI_Back", "repeat": 1, "hold_s": 0.0},
+                {"action": "UI_Back", "repeat": 1, "hold_s": 0.0},
+            ],
+        )
+        self.assertGreaterEqual(sleep_calls.count(0.5), 9)
 
     def test_market_sell_requires_current_docked_state(self) -> None:
         controls = FakeShipControls()
@@ -1074,7 +1085,7 @@ class RoutinesTests(unittest.TestCase):
             progress,
         )
 
-    def test_market_sell_indexes_zero_demand_priced_rows_after_normal_demand_rows(self) -> None:
+    def test_market_sell_inserts_hidden_sellable_target_into_original_sell_order(self) -> None:
         controls = FakeShipControls()
         watcher = FakeWatcher(
             [[{"event": "MarketSell", "Type": "foodcartridges", "Type_Localised": "Food Cartridges", "Count": 64, "TotalSale": 123456}]]
@@ -1094,12 +1105,36 @@ class RoutinesTests(unittest.TestCase):
                         "StationName": "Pawelczyk Dock",
                         "Items": [
                             {
-                                "Category": "Metals",
-                                "Name": "gold",
-                                "Name_Localised": "Gold",
-                                "Demand": 12,
+                                "Category": "Foods",
+                                "Name": "algae",
+                                "Name_Localised": "Algae",
+                                "Demand": 557_928,
                                 "DemandBracket": 1,
-                                "SellPrice": 10000,
+                                "SellPrice": 656,
+                            },
+                            {
+                                "Category": "Foods",
+                                "Name": "animalmeat",
+                                "Name_Localised": "Animal Meat",
+                                "Demand": 26_603,
+                                "DemandBracket": 1,
+                                "SellPrice": 1927,
+                            },
+                            {
+                                "Category": "Foods",
+                                "Name": "coffee",
+                                "Name_Localised": "Coffee",
+                                "Demand": 7_577,
+                                "DemandBracket": 1,
+                                "SellPrice": 1926,
+                            },
+                            {
+                                "Category": "Foods",
+                                "Name": "fish",
+                                "Name_Localised": "Fish",
+                                "Demand": 76_275,
+                                "DemandBracket": 1,
+                                "SellPrice": 942,
                             },
                             {
                                 "Category": "Foods",
@@ -1131,8 +1166,8 @@ class RoutinesTests(unittest.TestCase):
             )
 
         self.assertEqual(result.dispatch.status, "ok")
-        self.assertIn("Target 'Food Cartridges' at position 1 in sell list (2 items)", progress)
-        self.assertIn("  UI_Down x1 (navigate to 'Food Cartridges')", progress)
+        self.assertIn("Target 'Food Cartridges' at position 4 in sell list (5 items)", progress)
+        self.assertIn("  UI_Down x4 (navigate to 'Food Cartridges')", progress)
 
 
 class EscapeMassLockTests(unittest.TestCase):

@@ -338,7 +338,7 @@ class ControlRoomCommandTests(unittest.TestCase):
         self.assertIn("0", markup)
         self.assertIn("1,929", markup)
 
-    def test_market_markup_lists_zero_demand_priced_sell_rows_after_normal_demand_rows(self) -> None:
+    def test_market_markup_keeps_sell_rows_plain_name_sorted(self) -> None:
         market = MarketData(
             station="Pawelczyk Dock",
             system="HIP 58412",
@@ -365,7 +365,7 @@ class ControlRoomCommandTests(unittest.TestCase):
 
         markup = control_room_rendering.market_markup(market, None)
 
-        self.assertLess(markup.index("Gold"), markup.index("Food Cartridges"))
+        self.assertLess(markup.index("Food Cartridges"), markup.index("Gold"))
 
     def test_load_market_json_seeds_ship_station_when_in_station(self) -> None:
         journal_dir = Path(self.tmpdir.name)

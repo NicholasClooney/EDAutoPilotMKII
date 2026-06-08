@@ -36,26 +36,27 @@ def _is_sell_market_item(item: dict) -> bool:
     return demand_bracket > 0 or sell_price > 0
 
 
-def _sell_market_sort_key(item: dict) -> tuple[int, str, str]:
-    demand_bracket = int(item.get("DemandBracket", 0) or 0)
-    category = _market_localised(item, "Category").lower()
-    name = _market_localised(item, "Name").lower()
-    # The in-game SELL tab keeps zero-demand priced rows after the normal
-    # demand list instead of merging them into one flat alphabetical list.
-    zero_demand_group = 0 if demand_bracket > 0 else 1
-    return (zero_demand_group, category, name)
-
-
 def _market_sell_list(items: list[dict]) -> list[tuple[str, str]]:
-    # Some legitimate sell rows fall to DemandBracket=0 while still exposing a
-    # sell price in the in-game market. Placeholder rows still lack both.
-    sell_items = [item for item in items if _is_sell_market_item(item)]
-    sell_items.sort(key=_sell_market_sort_key)
     rows = [
         (_market_localised(it, "Category"), _market_localised(it, "Name"))
-        for it in sell_items
+        for it in items
+        if int(it.get("DemandBracket", 0) or 0) > 0
     ]
-    return rows
+    return sorted(rows, key=lambda r: (r[0].lower(), r[1].lower()))
+
+
+def _market_sell_list_for_target(items: list[dict], target_item: dict | None) -> list[tuple[str, str]]:
+    rows = _market_sell_list(items)
+    if target_item is None or not _is_sell_market_item(target_item):
+        return rows
+    target_row = (
+        _market_localised(target_item, "Category"),
+        _market_localised(target_item, "Name"),
+    )
+    if any(name.lower() == target_row[1].lower() for _, name in rows):
+        return rows
+    rows = rows + [target_row]
+    return sorted(rows, key=lambda r: (r[0].lower(), r[1].lower()))
 
 
 def _market_item_index(sorted_items: list[tuple[str, str]], target: str) -> int:
@@ -264,9 +265,32 @@ def _market_ui_reset(
     if progress_fn is not None:
         progress_fn("Resetting UI state...")
         progress_fn("  UI_Back x4 (reset to station menu)")
-    dispatch = controls.ui_back(repeat=4)
-    if dispatch.status == "ok" and step_delay_s > 0:
-        sleeper(step_delay_s)
+    dispatch = ActionDispatchResult(action="UI_Back", status="ok")
+    for _ in range(4):
+        dispatch = controls.ui_back()
+        if dispatch.status != "ok":
+            return dispatch
+        if step_delay_s > 0:
+            sleeper(step_delay_s)
+    return dispatch
+
+
+def _market_back_out_to_station_menu(
+    controls: SupportsMarketControls,
+    *,
+    step_delay_s: float,
+    sleeper: Callable[[float], None],
+    progress_fn: Callable[[str], None] | None,
+) -> ActionDispatchResult:
+    if progress_fn is not None:
+        progress_fn("  UI_Back x4 (return to station menu)")
+    dispatch = ActionDispatchResult(action="UI_Back", status="ok")
+    for _ in range(4):
+        dispatch = controls.ui_back()
+        if dispatch.status != "ok":
+            return dispatch
+        if step_delay_s > 0:
+            sleeper(step_delay_s)
     return dispatch
 
 
@@ -516,12 +540,16 @@ def _market_trade_attempt(
 
     items: list[dict] = data.get("Items", [])
 
-    sorted_items = _market_buy_list(items) if side == "buy" else _market_sell_list(items)
+    item = _find_market_item(items, target, side)
+    sorted_items = (
+        _market_buy_list(items)
+        if side == "buy"
+        else _market_sell_list_for_target(items, item)
+    )
     try:
         item_index = _market_item_index(sorted_items, target)
     except ValueError as exc:
         return _market_error(event_type, str(exc))
-    item = _find_market_item(items, target, side)
     if item is None:
         return _market_error(event_type, f"'{target}' matched navigation list but not market item data")
 
@@ -667,9 +695,12 @@ def _market_trade_attempt(
         progress_fn(f"{event_type}: {count}x {target}, {cr_val} CR total")
 
     # Return to station menu
-    if progress_fn is not None:
-        progress_fn("  UI_Back x4 (return to station menu)")
-    back_dispatch = controls.ui_back(repeat=4)
+    back_dispatch = _market_back_out_to_station_menu(
+        controls,
+        step_delay_s=step_delay_s,
+        sleeper=sleeper,
+        progress_fn=progress_fn,
+    )
     if back_dispatch.status != "ok":
         return RoutineResult(
             action="UI_Back",
@@ -677,8 +708,6 @@ def _market_trade_attempt(
             trigger_event=trade_event,
             details={"phase": "return_to_station_menu"},
         )
-    if step_delay_s > 0:
-        sleeper(step_delay_s)
     if side == "sell":
         docked, reason = _is_currently_docked(market_path.parent)
         if not docked:

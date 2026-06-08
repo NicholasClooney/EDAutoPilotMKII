@@ -55,6 +55,8 @@ Use [docs/session-log.md](docs/session-log.md) for concise rolling session notes
 
 - When generating test sequences with contradictory actions, leave time between them so the effect is observable. Examples: `SetSpeedZero -> SetSpeed100 -> SetSpeedZero`, `RollLeftButton -> RollRightButton -> RollLeftButton`.
 - Prefer explicit per-step `delay=` in `ship_controls.py` sequences for this spacing.
+- Never collapse repeating actions into a single repeated dispatch without delays. When an action needs to fire multiple times, send separate presses/taps with a delay between them.
+- If a control helper exposes `repeat`, it must implement that as repeated single actions with built-in pacing, or the call site should be expanded into explicit separate actions instead.
 
 ## Agent Loop
 
