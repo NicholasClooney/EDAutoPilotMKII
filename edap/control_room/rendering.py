@@ -9,6 +9,7 @@ from rich.markup import escape
 from rich.text import Text
 
 from edap.control_room.models import HaulStats, MarketData, ShipState
+from edap.routines.market import _is_sell_market_item
 
 
 def fmt_cr(n: int) -> str:
@@ -244,7 +245,7 @@ def market_markup(market: MarketData, market_filter: str | None) -> str:
     ]
     sell = [
         (loc(item, "Name"), item.get("Demand", 0), item.get("SellPrice", 0))
-        for item in items if item.get("DemandBracket", 0) > 0
+        for item in items if _is_sell_market_item(item)
     ]
 
     sections: list[str] = [header]

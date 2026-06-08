@@ -913,6 +913,57 @@ class RoutinesTests(unittest.TestCase):
             ],
         )
 
+    def test_market_sell_allows_zero_demand_when_sell_price_is_present(self) -> None:
+        controls = FakeShipControls()
+        watcher = FakeWatcher(
+            [[{"event": "MarketSell", "Type": "foodcartridges", "Type_Localised": "Food Cartridges", "Count": 64, "TotalSale": 123456}]]
+        )
+        progress: list[str] = []
+
+        with tempfile.TemporaryDirectory() as tmp:
+            journal_dir = Path(tmp)
+            market_path = journal_dir / "Market.json"
+            market_path.write_text(
+                json.dumps(
+                    {
+                        "StationName": "Pawelczyk Dock",
+                        "Items": [
+                            {
+                                "Category": "Foods",
+                                "Name": "foodcartridges",
+                                "Name_Localised": "Food Cartridges",
+                                "Demand": 0,
+                                "DemandBracket": 0,
+                                "SellPrice": 1929,
+                            },
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            result = market_sell(
+                controls,
+                watcher,
+                market_path=market_path,
+                target="Food Cartridges",
+                amount="MAX",
+                step_delay_s=0.0,
+                nav_delay_s=0.0,
+                trade_timeout_s=30.0,
+                skip_station_check=True,
+                time_fn=lambda: 0.0,
+                sleeper=lambda _: None,
+                progress_fn=progress.append,
+            )
+
+        self.assertEqual(result.dispatch.status, "ok")
+        self.assertIn("Target 'Food Cartridges' at position 0 in sell list (1 items)", progress)
+        self.assertIn(
+            "Station demand for Food Cartridges is 0 units; cargo capacity unavailable, skipping low-level threshold check.",
+            progress,
+        )
+
 
 class EscapeMassLockTests(unittest.TestCase):
     def _write_status(self, journal_dir: Path, *, mass_locked: bool) -> None:

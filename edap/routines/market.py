@@ -28,13 +28,21 @@ def _market_buy_list(items: list[dict]) -> list[tuple[str, str]]:
     return sorted(rows, key=lambda r: (r[0].lower(), r[1].lower()))
 
 
+def _is_sell_market_item(item: dict) -> bool:
+    demand_bracket = int(item.get("DemandBracket", 0) or 0)
+    sell_price = int(item.get("SellPrice", 0) or 0)
+    # Some stations still allow sales even when demand has fallen to zero.
+    # Keep excluding placeholder rows that have no demand signal and no price.
+    return demand_bracket > 0 or sell_price > 0
+
+
 def _market_sell_list(items: list[dict]) -> list[tuple[str, str]]:
-    # DemandBracket > 0 matches the in-game sell tab. Items with Demand=1 and
-    # bracket=0 are placeholders the game does not display or accept.
+    # Some legitimate sell rows fall to DemandBracket=0 while still exposing a
+    # sell price in the in-game market. Placeholder rows still lack both.
     rows = [
         (_market_localised(it, "Category"), _market_localised(it, "Name"))
         for it in items
-        if it.get("DemandBracket", 0) > 0
+        if _is_sell_market_item(it)
     ]
     return sorted(rows, key=lambda r: (r[0].lower(), r[1].lower()))
 
@@ -136,7 +144,7 @@ def _find_market_item(items: list[dict], target: str, side: str) -> dict | None:
     for item in items:
         if side == "buy" and item.get("Stock", 0) <= 0:
             continue
-        if side == "sell" and item.get("DemandBracket", 0) <= 0:
+        if side == "sell" and not _is_sell_market_item(item):
             continue
         if (
             _market_localised(item, "Name").lower() == target_lower

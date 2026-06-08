@@ -26,7 +26,7 @@ from edap.config import (
 )
 from edap.control_room.events import apply_ship_event
 from edap.control_room import rendering as control_room_rendering
-from edap.control_room.models import ShipState
+from edap.control_room.models import MarketData, ShipState
 from edap.control_room_state import CommandHistoryEntry
 from edap.routines import RoutineResult
 from edap.runtime import ResolvedPath, RuntimeContext
@@ -313,6 +313,30 @@ class ControlRoomCommandTests(unittest.TestCase):
         self.assertIn("Destination", markup)
         self.assertIn("Achenar / Dawes Hub / Dawes Hub", markup)
         self.assertIn("\n[dim]Destination[/]  [yellow]Achenar / Dawes Hub / Dawes Hub[/]", markup)
+
+    def test_market_markup_shows_zero_demand_sell_rows_with_sell_price(self) -> None:
+        market = MarketData(
+            station="Pawelczyk Dock",
+            system="HIP 58412",
+            timestamp="2026-06-08T20:09:46Z",
+            items=[
+                {
+                    "Category": "Foods",
+                    "Name": "foodcartridges",
+                    "Name_Localised": "Food Cartridges",
+                    "Demand": 0,
+                    "DemandBracket": 0,
+                    "SellPrice": 1929,
+                }
+            ],
+        )
+
+        markup = control_room_rendering.market_markup(market, None)
+
+        self.assertIn("SELL TO MARKET", markup)
+        self.assertIn("Food Cartridges", markup)
+        self.assertIn("0", markup)
+        self.assertIn("1,929", markup)
 
     def test_load_market_json_seeds_ship_station_when_in_station(self) -> None:
         journal_dir = Path(self.tmpdir.name)
