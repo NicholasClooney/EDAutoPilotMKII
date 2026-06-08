@@ -19,6 +19,7 @@ Last updated: 2026-06-08
 - Two-way haul departures now auto-tap raw key `k` after mass lock clears to engage hyperspace FSD by default; `controls.haul_two_way_auto_hyperspace_engage` disables it when needed.
 - Two-way haul transit now opens the left external panel on hyperspace arrival by default so the nav page is ready for station approach, after a configurable default 3-second delay; `controls.haul_two_way_open_nav_panel_after_hyperspace_arrival` and `controls.haul_two_way_nav_panel_open_delay_seconds` control that behavior.
 - Two-way haul clear-of-station waits now default to 10 minutes; if the `NoTrack` music event still never arrives after undock, the haul aborts instead of continuing, logs a replay/`ctrl-r` recovery hint, and keeps the spoken alert short.
+- Control-room haul telemetry now matches the two-way route flow: it carries the station-1 buy cost into the next clean departure, counts both station sells plus the station-2 buy, and closes a run when the return cargo is sold at station 1 instead of waiting for the next undock.
 - Control room: live Textual UI with ship status, market panel, haul stats, replay/history, persisted state, and routine dispatch.
 - Control room: live Textual UI with ship status, market panel, haul stats, replay/history, persisted state, routine dispatch, and queued cross-platform TTS announcements for haul/navigation milestones.
 - TTS/config: announcement IDs are typed in code, while default phrase text now lives in `defaults/tts.toml` and merges with user `config.toml` overrides under `[tts]`.
@@ -35,7 +36,7 @@ Last updated: 2026-06-08
 
 ## Current Next Steps
 
-1. Live-validate the updated two-way haul startup path, especially station-2 starts and `Market.json` fallback behavior.
+1. Live-validate the updated two-way haul startup path and haul telemetry, especially station-2 starts, station-1 run finalization, and `Market.json` fallback behavior.
 2. Live-test the new queued TTS callouts on macOS and trim or reword noisy announcements based on operator feedback.
 3. Keep the timing guard in place and expand it only after measuring stable CI variance on other candidate suites.
 4. Continue the next portability follow-up slice: CV capture/performance measurement, journal latency measurement, and diagnostics/dashboard work from plans 0002-0004.

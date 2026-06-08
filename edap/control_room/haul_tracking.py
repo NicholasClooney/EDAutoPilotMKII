@@ -69,11 +69,12 @@ def finalize_completed_haul_run(app: HaulTrackingHost) -> None:
     stats.last_run_profit = stats.current_run_profit
     stats.total_run_elapsed_s += elapsed
     stats.accumulated_profit += stats.current_run_profit
+    stats.clean_run_active = False
     stats.current_run_profit = 0
-    stats.current_run_started_at = app._time_fn()
+    stats.current_run_started_at = None
     stats.current_run_elapsed_s = None
     stats.docked_back_at_station_1 = False
-    stats.waiting_for_station_1_departure = False
+    stats.waiting_for_station_1_departure = True
     stats.resumed_mid_run = False
     app._announce_tts(
         AnnouncementId.ROUTE_COMPLETE,
@@ -102,16 +103,13 @@ def handle_haul_event(
     )
 
     if event == "Undocked" and at_station_1:
-        if stats.docked_back_at_station_1:
-            finalize_completed_haul_run(app)
-        elif stats.current_run_started_at is None:
+        if stats.current_run_started_at is None:
             stats.current_run_started_at = app._time_fn()
             stats.current_run_elapsed_s = None
         stats.clean_run_active = True
         stats.waiting_for_station_1_departure = False
         stats.resumed_mid_run = False
         stats.docked_back_at_station_1 = False
-        stats.current_run_profit = 0
     elif event == "Docked" and ev.get("StationName", "").lower() == stats.station_1.lower():
         if stats.clean_run_active and stats.current_run_started_at is not None:
             stats.current_run_elapsed_s = app._time_fn() - stats.current_run_started_at
@@ -121,9 +119,22 @@ def handle_haul_event(
                 stats.current_run_elapsed_s = app._time_fn() - stats.current_run_started_at
             stats.resumed_mid_run = False
             stats.waiting_for_station_1_departure = True
-    elif event == "MarketBuy" and stats.clean_run_active and at_station_2 and "TotalCost" in ev:
-        stats.current_run_profit -= int(ev["TotalCost"])
-    elif event == "MarketSell" and stats.clean_run_active and at_station_1 and "TotalSale" in ev:
-        stats.current_run_profit += int(ev["TotalSale"])
+    elif event == "MarketBuy" and "TotalCost" in ev:
+        total_cost = int(ev["TotalCost"])
+        if stats.clean_run_active and at_station_2:
+            stats.current_run_profit -= total_cost
+        elif at_station_1 and stats.waiting_for_station_1_departure:
+            if stats.current_run_started_at is not None:
+                stats.current_run_started_at = None
+                stats.current_run_elapsed_s = None
+            stats.current_run_profit -= total_cost
+    elif event == "MarketSell" and "TotalSale" in ev:
+        total_sale = int(ev["TotalSale"])
+        if stats.clean_run_active and at_station_2:
+            stats.current_run_profit += total_sale
+        elif stats.clean_run_active and at_station_1:
+            stats.current_run_profit += total_sale
+            if stats.docked_back_at_station_1:
+                finalize_completed_haul_run(app)
 
     app._refresh_haul_stats()

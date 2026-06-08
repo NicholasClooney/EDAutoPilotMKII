@@ -622,35 +622,50 @@ class ControlRoomBindingsTests(unittest.TestCase):
         self.assertTrue(self.app._haul_stats.waiting_for_station_1_departure)
         self.assertEqual(self.app._haul_stats.current_run_started_at, 100.0)
 
+        self.app._handle_haul_event({"event": "MarketBuy", "TotalCost": 100_000}, station_before="Pawelczyk Dock")
+        self.assertEqual(self.app._haul_stats.current_run_profit, -100_000)
+        self.assertIsNone(self.app._haul_stats.current_run_started_at)
+
         self.app._time_fn = lambda: 110.0
         self.app._handle_haul_event({"event": "Undocked"}, station_before="Pawelczyk Dock")
         self.assertTrue(self.app._haul_stats.clean_run_active)
-        self.assertEqual(self.app._haul_stats.current_run_started_at, 100.0)
+        self.assertEqual(self.app._haul_stats.current_run_started_at, 110.0)
+        self.assertEqual(self.app._haul_stats.current_run_profit, -100_000)
+
+        self.app._time_fn = lambda: 150.0
+        self.app._handle_haul_event({"event": "MarketSell", "TotalSale": 250_000}, station_before="Hutton Orbital")
+        self.assertEqual(self.app._haul_stats.current_run_profit, 150_000)
 
         self.app._time_fn = lambda: 200.0
         self.app._handle_haul_event({"event": "MarketBuy", "TotalCost": 250_000}, station_before="Hutton Orbital")
-        self.assertEqual(self.app._haul_stats.current_run_profit, -250_000)
+        self.assertEqual(self.app._haul_stats.current_run_profit, -100_000)
 
         self.app._time_fn = lambda: 310.0
         self.app._handle_haul_event({"event": "Docked", "StationName": "Pawelczyk Dock"}, station_before=None)
         self.assertTrue(self.app._haul_stats.docked_back_at_station_1)
-        self.assertEqual(self.app._haul_stats.current_run_elapsed_s, 210.0)
+        self.assertEqual(self.app._haul_stats.current_run_elapsed_s, 200.0)
 
         self.app._time_fn = lambda: 315.0
         self.app._handle_haul_event({"event": "MarketSell", "TotalSale": 400_000}, station_before="Pawelczyk Dock")
-        self.assertEqual(self.app._haul_stats.current_run_profit, 150_000)
-
-        self.app._time_fn = lambda: 320.0
-        self.app._handle_haul_event({"event": "Undocked"}, station_before="Pawelczyk Dock")
         self.assertEqual(self.app._haul_stats.completed_runs, 1)
-        self.assertEqual(self.app._haul_stats.last_run_profit, 150_000)
-        self.assertEqual(self.app._haul_stats.accumulated_profit, 150_000)
-        self.assertEqual(self.app._haul_stats.last_run_elapsed_s, 210.0)
-        self.assertEqual(self.app._haul_stats.current_run_started_at, 320.0)
+        self.assertEqual(self.app._haul_stats.last_run_profit, 300_000)
+        self.assertEqual(self.app._haul_stats.accumulated_profit, 300_000)
+        self.assertEqual(self.app._haul_stats.last_run_elapsed_s, 200.0)
+        self.assertIsNone(self.app._haul_stats.current_run_started_at)
+        self.assertTrue(self.app._haul_stats.waiting_for_station_1_departure)
         self.assertIn(
-            (AnnouncementId.ROUTE_COMPLETE, {"cycle_count": 1, "total_profit_short": "150 thousand credits"}),
+            (AnnouncementId.ROUTE_COMPLETE, {"cycle_count": 1, "total_profit_short": "300 thousand credits"}),
             self.app._tts.calls,
         )
+
+        self.app._time_fn = lambda: 320.0
+        self.app._handle_haul_event({"event": "MarketBuy", "TotalCost": 125_000}, station_before="Pawelczyk Dock")
+        self.assertEqual(self.app._haul_stats.current_run_profit, -125_000)
+
+        self.app._handle_haul_event({"event": "Undocked"}, station_before="Pawelczyk Dock")
+        self.assertTrue(self.app._haul_stats.clean_run_active)
+        self.assertEqual(self.app._haul_stats.current_run_started_at, 320.0)
+        self.assertEqual(self.app._haul_stats.current_run_profit, -125_000)
 
     def test_haul_stats_ignore_partial_resume_until_next_clean_departure(self) -> None:
         self.app._ship.status = "in_supercruise"
@@ -674,6 +689,16 @@ class ControlRoomBindingsTests(unittest.TestCase):
         self.assertFalse(self.app._haul_stats.clean_run_active)
         self.assertEqual(self.app._haul_stats.current_run_elapsed_s, 150.0)
         self.assertEqual(self.app._haul_stats.completed_runs, 0)
+
+        self.app._handle_haul_event({"event": "MarketBuy", "TotalCost": 175_000}, station_before="Pawelczyk Dock")
+        self.assertEqual(self.app._haul_stats.current_run_profit, -175_000)
+        self.assertIsNone(self.app._haul_stats.current_run_started_at)
+
+        self.app._time_fn = lambda: 225.0
+        self.app._handle_haul_event({"event": "Undocked"}, station_before="Pawelczyk Dock")
+        self.assertTrue(self.app._haul_stats.clean_run_active)
+        self.assertEqual(self.app._haul_stats.current_run_started_at, 225.0)
+        self.assertEqual(self.app._haul_stats.current_run_profit, -175_000)
 
     def test_stop_haul_stats_announces_session_summary(self) -> None:
         self.app._tts = _FakeTTS()
