@@ -220,3 +220,14 @@ class ShipControls:
 
     def submit_text(self, repeat: int = 1, hold_s: float = 0.2) -> ActionDispatchResult:
         return self._dispatcher.tap_key("enter", repeat=repeat, hold_s=hold_s)
+
+    def tap_key(
+        self,
+        key: str,
+        *,
+        modifier: str | None = None,
+        repeat: int = 1,
+        hold_s: float | None = None,
+    ) -> ActionDispatchResult:
+        plan = self.plan_action(f"raw:{key}", repeat=repeat, hold_s=hold_s)
+        return self._dispatcher.tap_key(key, modifier=modifier, repeat=plan.repeat, hold_s=plan.hold_s)

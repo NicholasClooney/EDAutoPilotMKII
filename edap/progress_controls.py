@@ -116,3 +116,14 @@ class ProgressShipControls:
     def submit_text(self, repeat: int = 1, hold_s: float | None = None) -> ActionDispatchResult:
         self._log("Enter", repeat)
         return self._controls.submit_text(repeat=repeat, hold_s=hold_s)
+
+    def tap_key(
+        self,
+        key: str,
+        *,
+        modifier: str | None = None,
+        repeat: int = 1,
+        hold_s: float | None = None,
+    ) -> ActionDispatchResult:
+        self._log(f"raw:{key}", repeat)
+        return self._controls.tap_key(key, modifier=modifier, repeat=repeat, hold_s=hold_s)

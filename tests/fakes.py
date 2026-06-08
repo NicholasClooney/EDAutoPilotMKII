@@ -78,6 +78,24 @@ class FakeShipControls:
     def submit_text(self, repeat: int = 1, hold_s: float = 0.0) -> ActionDispatchResult:
         return self._dispatch("Enter", repeat, hold_s)
 
+    def tap_key(
+        self,
+        key: str,
+        *,
+        modifier: str | None = None,
+        repeat: int = 1,
+        hold_s: float | None = None,
+    ) -> ActionDispatchResult:
+        planned_hold_s = 0.0 if hold_s is None else hold_s
+        self.calls.append({
+            "action": f"raw:{key}",
+            "key": key,
+            "modifier": modifier,
+            "repeat": repeat,
+            "hold_s": planned_hold_s,
+        })
+        return _OK
+
 
 class FakeWatcher:
     def __init__(self, batches: list[list[dict[str, object]]]) -> None:

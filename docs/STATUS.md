@@ -16,6 +16,8 @@ Last updated: 2026-06-08
 - Routines: `jump`, `dock`, `undock`, market buy/sell, galaxy-map destination setting, throttle zeroing, and the current two-station haul loop all exist behind `edap/routines/`.
 - Two-way haul startup now detects the active station/phase from journal position, `Cargo.json`, and `Market.json` fallback data, so a station-2 start no longer blindly runs station-1 actions first.
 - Two-way haul transit resume now distinguishes “already dropped near destination” from “docking already requested/granted”: it skips the extra `SupercruiseExit` wait in the first case, and waits for `Docked` instead of re-requesting docking in the second.
+- Two-way haul departures now auto-tap raw key `k` after mass lock clears to engage hyperspace FSD by default; `controls.haul_two_way_auto_hyperspace_engage` disables it when needed.
+- Two-way haul transit now opens the left external panel on hyperspace arrival by default so the nav page is ready for station approach; `controls.haul_two_way_open_nav_panel_after_hyperspace_arrival` disables it when needed.
 - Control room: live Textual UI with ship status, market panel, haul stats, replay/history, persisted state, and routine dispatch.
 - Platform scope: macOS + CrossOver is the only live-validated operator path. Windows and Linux input/runtime paths exist with unit-test and CI coverage, but not live validation.
 - CI: cross-platform unittest workflow exists in GitHub Actions, and a timing guard now enforces a 10-second ceiling on `tests/test_haul_loop.py`.

@@ -8,7 +8,12 @@ from time import monotonic, sleep
 from typing import Callable
 
 from edap.actions import ActionDispatchResult
-from edap.routines._base import RoutineResult, SupportsHaulControls, SupportsPollEvents
+from edap.routines._base import (
+    RoutineResult,
+    SupportsHaulControls,
+    SupportsPollEvents,
+    _is_in_supercruise_event,
+)
 from edap.routines.docking import _undock_until_undocked, _wait_for_clear_of_station, dock, station_refuel_menu
 from edap.routines.escape import escape_mass_lock
 from edap.routines.galaxy_map import set_gal_map_destination
@@ -66,6 +71,7 @@ def _read_latest_journal_events(journal_dir: Path) -> list[dict]:
 
 class _TransitResumeState(Enum):
     NONE = auto()
+    ARRIVED_IN_DESTINATION_SYSTEM = auto()
     POST_DROP_NEAR_STATION = auto()
     AWAITING_DOCKED = auto()
 
@@ -96,7 +102,15 @@ def _detect_transit_resume_state(events: list[dict], destination_leg: StationLeg
                 else _TransitResumeState.NONE
             )
 
-        if evt_name in {"SupercruiseEntry", "FSDJump", "Undocked"}:
+        if evt_name in {"SupercruiseEntry", "FSDJump"}:
+            system_name = str(event.get("StarSystem", "")).lower()
+            return (
+                _TransitResumeState.ARRIVED_IN_DESTINATION_SYSTEM
+                if not destination_system or not system_name or system_name == destination_system
+                else _TransitResumeState.NONE
+            )
+
+        if evt_name == "Undocked":
             return _TransitResumeState.NONE
 
     return _TransitResumeState.NONE
@@ -161,10 +175,47 @@ class _HaulCtx:
     deny_retry_delay_s: float
     mass_lock_boost_delay_s: float
     post_sell_settle_s: float
+    auto_hyperspace_engage: bool
+    open_nav_panel_after_hyperspace_arrival: bool
     max_dock_retries: int
     time_fn: Callable[[], float]
     sleeper: Callable[[float], None]
     progress_fn: Callable[[str], None] | None
+
+
+def _engage_hyperspace_after_escape(ctx: _HaulCtx) -> None:
+    if not ctx.auto_hyperspace_engage:
+        return
+    if ctx.progress_fn is not None:
+        ctx.progress_fn('Mass lock cleared - engaging hyperspace via raw key "k"...')
+    ctx.controls.tap_key("k")
+
+
+def _open_navigation_panel_after_arrival(ctx: _HaulCtx) -> None:
+    if not ctx.open_nav_panel_after_hyperspace_arrival:
+        return
+    if ctx.progress_fn is not None:
+        ctx.progress_fn("Hyperspace complete - opening left panel for navigation...")
+    dispatch = ctx.controls.focus_left_panel()
+    if dispatch.status != "ok" and ctx.progress_fn is not None:
+        ctx.progress_fn(f"Warning: could not open left panel ({dispatch.reason or dispatch.status}); continuing")
+
+
+def _wait_for_arrival_or_approach_event(
+    watcher: SupportsPollEvents,
+    *,
+    deadline: float,
+    time_fn: Callable[[], float],
+) -> tuple[bool, list[dict[str, object]]]:
+    approach_events = {"SupercruiseExit", "DockingRequested", "DockingGranted", "Docked"}
+    while time_fn() <= deadline:
+        batch = watcher.poll()
+        for index, event in enumerate(batch):
+            if _is_in_supercruise_event(event):
+                return True, batch[index + 1:]
+            if event.get("event") in approach_events:
+                return False, batch[index:]
+    return False, []
 
 
 def _detect_start_phase(
@@ -396,6 +447,7 @@ def _undock_and_route(
         sleeper=ctx.sleeper,
         progress_fn=ctx.progress_fn,
     )
+    _engage_hyperspace_after_escape(ctx)
     return (
         clear_result if clear_result.dispatch.status == "ok" else result,
         next_phase,
@@ -431,6 +483,7 @@ def _depart_system(
         sleeper=ctx.sleeper,
         progress_fn=ctx.progress_fn,
     )
+    _engage_hyperspace_after_escape(ctx)
     return None, next_phase
 
 
@@ -442,13 +495,16 @@ def _run_transit(
 ) -> tuple[RoutineResult, Phase]:
     recent_events = _read_latest_journal_events(ctx.journal_dir)
     resume_state = _detect_transit_resume_state(recent_events, destination_leg)
+    pending_events: list[dict[str, object]] = []
     if ctx.progress_fn is not None:
         if resume_state == _TransitResumeState.AWAITING_DOCKED:
             ctx.progress_fn(f"Docking already in progress for {destination_leg.label} - waiting for Docked.")
+        elif resume_state == _TransitResumeState.ARRIVED_IN_DESTINATION_SYSTEM:
+            ctx.progress_fn(f"Already in supercruise in {destination_leg.label} system - opening navigation panel.")
         elif resume_state == _TransitResumeState.POST_DROP_NEAR_STATION:
             ctx.progress_fn(f"Already in normal space near {destination_leg.label} - skipping drop wait.")
         else:
-            ctx.progress_fn(f"Waiting for drop near {destination_leg.label}...")
+            ctx.progress_fn(f"Waiting for hyperspace arrival in {destination_leg.label} system...")
 
     if resume_state == _TransitResumeState.AWAITING_DOCKED:
         return (
@@ -464,10 +520,26 @@ def _run_transit(
             next_phase,
         )
 
+    if resume_state == _TransitResumeState.NONE:
+        arrival_observed, pending_events = _wait_for_arrival_or_approach_event(
+            ctx.watcher,
+            deadline=ctx.time_fn() + ctx.dock_timeout_s,
+            time_fn=ctx.time_fn,
+        )
+        if not arrival_observed:
+            if ctx.progress_fn is not None:
+                ctx.progress_fn("Warning: hyperspace arrival event not observed; continuing toward station.")
+        else:
+            if ctx.progress_fn is not None:
+                ctx.progress_fn("Arrived in destination system")
+            _open_navigation_panel_after_arrival(ctx)
+    elif resume_state == _TransitResumeState.ARRIVED_IN_DESTINATION_SYSTEM:
+        _open_navigation_panel_after_arrival(ctx)
+
     result = dock(
         ctx.controls,
         ctx.watcher,
-        wait_for_supercruise_exit=resume_state == _TransitResumeState.NONE,
+        wait_for_supercruise_exit=resume_state != _TransitResumeState.POST_DROP_NEAR_STATION,
         auto_refuel=True,
         max_retries=ctx.max_dock_retries,
         request_timeout_s=ctx.request_timeout_s,
@@ -479,6 +551,7 @@ def _run_transit(
         time_fn=ctx.time_fn,
         sleeper=ctx.sleeper,
         progress_fn=ctx.progress_fn,
+        pending_events=pending_events,
     )
     return result, next_phase
 
@@ -583,6 +656,8 @@ def haul_loop_two_way(
     deny_retry_delay_s: float = 5.0,
     mass_lock_boost_delay_s: float = 5.0,
     post_sell_settle_s: float = 2.0,
+    auto_hyperspace_engage: bool = True,
+    open_nav_panel_after_hyperspace_arrival: bool = True,
     max_dock_retries: int = 3,
     time_fn: Callable[[], float] = monotonic,
     sleeper: Callable[[float], None] = sleep,
@@ -631,6 +706,8 @@ def haul_loop_two_way(
         deny_retry_delay_s=deny_retry_delay_s,
         mass_lock_boost_delay_s=mass_lock_boost_delay_s,
         post_sell_settle_s=post_sell_settle_s,
+        auto_hyperspace_engage=auto_hyperspace_engage,
+        open_nav_panel_after_hyperspace_arrival=open_nav_panel_after_hyperspace_arrival,
         max_dock_retries=max_dock_retries,
         time_fn=time_fn,
         sleeper=sleeper,

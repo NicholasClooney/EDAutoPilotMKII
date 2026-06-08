@@ -115,7 +115,26 @@ class SupportsGalaxyMapControls(Protocol):
         """Submit the current text entry, typically via Enter/Return."""
 
 
-class SupportsHaulControls(SupportsDockingControls, SupportsUndockControls, SupportsMarketControls, SupportsGalaxyMapControls, Protocol):
+class SupportsRawKeyControls(Protocol):
+    def tap_key(
+        self,
+        key: str,
+        *,
+        modifier: str | None = None,
+        repeat: int = 1,
+        hold_s: float | None = None,
+    ) -> ActionDispatchResult:
+        """Tap a raw key without going through action binding lookup."""
+
+
+class SupportsHaulControls(
+    SupportsDockingControls,
+    SupportsUndockControls,
+    SupportsMarketControls,
+    SupportsGalaxyMapControls,
+    SupportsRawKeyControls,
+    Protocol,
+):
     """Combined protocol for all controls needed in the haul loop."""
 
 

@@ -48,6 +48,8 @@ class ControlsConfig:
     market_nav_delay_seconds: float
     market_trade_max_attempts: int
     haul_post_sell_settle_seconds: float
+    haul_two_way_auto_hyperspace_engage: bool
+    haul_two_way_open_nav_panel_after_hyperspace_arrival: bool
 
 
 @dataclass(frozen=True)
@@ -312,6 +314,12 @@ def load_config(path: Path | str = DEFAULT_CONFIG_PATH) -> AppConfig:
             market_nav_delay_seconds=_float(controls, "market_nav_delay_seconds", 0.1),
             market_trade_max_attempts=_integer(controls, "market_trade_max_attempts", 3),
             haul_post_sell_settle_seconds=_float(controls, "haul_post_sell_settle_seconds", 2.0),
+            haul_two_way_auto_hyperspace_engage=_boolean(controls, "haul_two_way_auto_hyperspace_engage", True),
+            haul_two_way_open_nav_panel_after_hyperspace_arrival=_boolean(
+                controls,
+                "haul_two_way_open_nav_panel_after_hyperspace_arrival",
+                True,
+            ),
         ),
         screen=ScreenConfig(
             resolution_width=_integer(screen, "resolution_width", 1920),

@@ -132,6 +132,10 @@ def dispatch_haul_loop(
             galaxy_map_settle_s=galaxy_map_settle,
             mass_lock_boost_delay_s=app._config.controls.mass_lock_boost_delay_seconds,
             post_sell_settle_s=app._config.controls.haul_post_sell_settle_seconds,
+            auto_hyperspace_engage=app._config.controls.haul_two_way_auto_hyperspace_engage,
+            open_nav_panel_after_hyperspace_arrival=(
+                app._config.controls.haul_two_way_open_nav_panel_after_hyperspace_arrival
+            ),
             sleeper=sleeper,
             progress_fn=progress,
         ),

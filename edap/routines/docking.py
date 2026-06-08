@@ -15,7 +15,6 @@ from edap.routines._base import (
     _is_music_no_track_event,
     _is_supercruise_exit_event,
     _is_undocked_event,
-    _wait_for_event,
     _wait_for_event_with_pending,
 )
 
@@ -120,6 +119,7 @@ def station_refuel_menu(
     time_fn: Callable[[], float] = monotonic,
     sleeper: Callable[[float], None] = sleep,
     progress_fn: Callable[[str], None] | None = None,
+    pending_events: list[dict[str, object]] | None = None,
 ) -> RoutineResult:
     if dock_timeout_s < 0:
         raise ValueError("dock_timeout_s must be non-negative")
@@ -128,11 +128,12 @@ def station_refuel_menu(
 
     if progress_fn is not None:
         progress_fn("Waiting for Docked...")
-    docked_event = _wait_for_event(
+    docked_event, _ = _wait_for_event_with_pending(
         watcher,
         predicate=_is_docked_event,
         deadline=time_fn() + dock_timeout_s,
         time_fn=time_fn,
+        pending_events=pending_events,
     )
     if docked_event is None:
         return RoutineResult(
@@ -176,6 +177,7 @@ def dock(
     time_fn: Callable[[], float] = monotonic,
     sleeper: Callable[[float], None] = sleep,
     progress_fn: Callable[[str], None] | None = None,
+    pending_events: list[dict[str, object]] | None = None,
 ) -> RoutineResult:
     if max_retries < 1:
         raise ValueError("max_retries must be at least 1")
@@ -193,14 +195,16 @@ def dock(
         raise ValueError("deny_retry_delay_s must be non-negative")
 
     supercruise_exit_event: dict[str, object] | None = None
+    queued_events = list(pending_events or [])
     if wait_for_supercruise_exit:
         if progress_fn is not None:
             progress_fn("Waiting for SupercruiseExit...")
-        supercruise_exit_event = _wait_for_event(
+        supercruise_exit_event, queued_events = _wait_for_event_with_pending(
             watcher,
             predicate=_is_supercruise_exit_event,
             deadline=time_fn() + dock_timeout_s,
             time_fn=time_fn,
+            pending_events=queued_events,
         )
         if supercruise_exit_event is None:
             return RoutineResult(
@@ -227,7 +231,8 @@ def dock(
     # completes, skipping DockingRequested/DockingGranted silently.
     # When wait_for_supercruise_exit=True the supercruise _wait_for_event loop
     # already primed the offset; this call is then a fast no-op.
-    watcher.poll()
+    if not queued_events:
+        watcher.poll()
 
     request_event: dict[str, object] | None = None
     zero_dispatch: ActionDispatchResult | None = None
@@ -245,11 +250,12 @@ def dock(
 
         if progress_fn is not None:
             progress_fn("Waiting for docking response...")
-        response_event = _wait_for_event(
+        response_event, queued_events = _wait_for_event_with_pending(
             watcher,
             predicate=_is_docking_response_event,
             deadline=time_fn() + request_timeout_s,
             time_fn=time_fn,
+            pending_events=queued_events,
         )
         if response_event is None:
             if progress_fn is not None:
@@ -285,11 +291,12 @@ def dock(
 
     if progress_fn is not None:
         progress_fn("Waiting for Docked...")
-    docked_event = _wait_for_event(
+    docked_event, queued_events = _wait_for_event_with_pending(
         watcher,
         predicate=_is_docked_event,
         deadline=time_fn() + dock_timeout_s,
         time_fn=time_fn,
+        pending_events=queued_events,
     )
     if docked_event is None:
         return RoutineResult(
