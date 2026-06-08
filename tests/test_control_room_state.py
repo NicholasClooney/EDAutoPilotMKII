@@ -57,5 +57,66 @@ class ControlRoomStateTests(unittest.TestCase):
         self.assertFalse(loaded.instant_mode)
 
 
+    def test_drops_legacy_one_way_haul_history_entries(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "state.json"
+            path.write_text(
+                """
+                {
+                  "default_haul": {},
+                  "history": [
+                    {
+                      "raw": "haul Aluminium",
+                      "command": "haul",
+                      "params": {
+                        "commodity": "Aluminium",
+                        "buy_station": "Trevithick Dock",
+                        "sell_station": "Pawelczyk Dock",
+                        "buy_system": "Achenar",
+                        "sell_system": "Sol"
+                      },
+                      "timestamp": "2026-05-01T00:00:00Z"
+                    },
+                    {
+                      "raw": "haul Bertrandite",
+                      "command": "haul",
+                      "params": {
+                        "station_1_buying": "Aluminium",
+                        "station_2_buying": "Bertrandite",
+                        "station_1": "Pawelczyk Dock",
+                        "station_2": "Trevithick Dock"
+                      },
+                      "timestamp": "2026-06-01T00:00:00Z"
+                    },
+                    {
+                      "raw": "jump",
+                      "command": "jump",
+                      "params": {},
+                      "timestamp": "2026-06-02T00:00:00Z"
+                    }
+                  ]
+                }
+                """,
+                encoding="utf-8",
+            )
+
+            loaded = load_control_room_state(path)
+
+        raws = [entry.raw for entry in loaded.history]
+        self.assertEqual(raws, ["haul Bertrandite", "jump"])
+
+    def test_drops_legacy_default_haul(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "state.json"
+            path.write_text(
+                '{"default_haul":{"commodity":"Aluminium","buy_station":"X","sell_station":"Y"},"history":[]}',
+                encoding="utf-8",
+            )
+
+            loaded = load_control_room_state(path)
+
+        self.assertEqual(loaded.default_haul, {})
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -22,6 +22,15 @@ class ControlRoomState:
     instant_mode: bool = False
 
 
+_LEGACY_HAUL_KEYS = frozenset({"commodity", "buy_station", "sell_station", "buy_system", "sell_system"})
+_TWO_WAY_HAUL_KEYS = frozenset({"station_1_buying", "station_2_buying", "station_1", "station_2"})
+
+
+def _is_legacy_haul_params(params: dict[str, Any]) -> bool:
+    keys = set(params.keys())
+    return bool(keys & _LEGACY_HAUL_KEYS) and not (keys & _TWO_WAY_HAUL_KEYS)
+
+
 def load_control_room_state(path: Path) -> ControlRoomState:
     if not path.exists():
         return ControlRoomState()
@@ -34,6 +43,8 @@ def load_control_room_state(path: Path) -> ControlRoomState:
 
     default_haul = raw.get("default_haul", raw.get("haul_defaults", {}))
     if not isinstance(default_haul, dict):
+        default_haul = {}
+    elif _is_legacy_haul_params(default_haul):
         default_haul = {}
 
     raw_history = raw.get("history", [])
@@ -52,6 +63,8 @@ def load_control_room_state(path: Path) -> ControlRoomState:
                 params = {}
             if not isinstance(timestamp, str):
                 timestamp = ""
+            if command == "haul" and _is_legacy_haul_params(params):
+                continue
             history.append(
                 CommandHistoryEntry(
                     raw=raw_command,
