@@ -48,6 +48,7 @@ def _make_config(journal_dir: Path) -> AppConfig:
             mass_lock_boost_delay_seconds=5.0,
             market_nav_delay_seconds=0.1,
             market_trade_max_attempts=3,
+            haul_post_sell_settle_seconds=2.0,
         ),
         screen=ScreenConfig(
             resolution_width=1920,

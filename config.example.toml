@@ -29,6 +29,11 @@ mass_lock_boost_delay_seconds = 5.0
 market_nav_delay_seconds = 0.1
 # Maximum buy/sell attempts before aborting when the matching MarketBuy/MarketSell journal event is not observed.
 market_trade_max_attempts = 3
+# Settle pause after the two-way haul sell phase before the buy phase presses UI_Select.
+# The sell phase ends with UI_Back x2 back to the station services menu, and the buy phase
+# immediately presses UI_Select to re-enter it; without this pause the Select can land on
+# stale UI before the menu has redrawn. Set to 0 to disable.
+haul_post_sell_settle_seconds = 2.0
 
 [screen]
 resolution_width = 1920

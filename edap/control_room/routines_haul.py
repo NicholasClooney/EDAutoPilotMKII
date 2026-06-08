@@ -131,6 +131,7 @@ def dispatch_haul_loop(
             dock_timeout_s=dock_timeout,
             galaxy_map_settle_s=galaxy_map_settle,
             mass_lock_boost_delay_s=app._config.controls.mass_lock_boost_delay_seconds,
+            post_sell_settle_s=app._config.controls.haul_post_sell_settle_seconds,
             sleeper=sleeper,
             progress_fn=progress,
         ),

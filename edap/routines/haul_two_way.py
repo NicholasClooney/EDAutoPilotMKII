@@ -80,6 +80,7 @@ class _HaulCtx:
     boost_settle_s: float
     deny_retry_delay_s: float
     mass_lock_boost_delay_s: float
+    post_sell_settle_s: float
     max_dock_retries: int
     time_fn: Callable[[], float]
     sleeper: Callable[[float], None]
@@ -123,6 +124,14 @@ def _run_market_sell(
     )
     if result.dispatch.status != "ok":
         return result, next_phase
+    # market_sell finishes with UI_Back x2, which returns us to the station
+    # services menu. The next phase (buy) immediately presses UI_Select to
+    # re-enter station services, and that select can land on stale UI if the
+    # menu has not finished redrawing. Settle here, on the sell side, because
+    # the gap exists only when we just came out of the menu - resume paths
+    # that drop straight into AT_STATION_*_BUY do not need it.
+    if ctx.post_sell_settle_s > 0:
+        ctx.sleeper(ctx.post_sell_settle_s)
     return result, next_phase
 
 
@@ -182,6 +191,7 @@ def _undock_and_route(
             journal_dir=ctx.journal_dir,
             step_delay_s=ctx.step_delay_s,
             map_settle_s=ctx.galaxy_map_settle_s,
+            sleeper=ctx.sleeper,
             progress_fn=ctx.progress_fn,
         )
 
@@ -227,6 +237,7 @@ def _depart_system(
             journal_dir=ctx.journal_dir,
             step_delay_s=ctx.step_delay_s,
             map_settle_s=ctx.galaxy_map_settle_s,
+            sleeper=ctx.sleeper,
             progress_fn=ctx.progress_fn,
         )
     escape_mass_lock(
@@ -366,6 +377,7 @@ def haul_loop_two_way(
     boost_settle_s: float = 3.0,
     deny_retry_delay_s: float = 5.0,
     mass_lock_boost_delay_s: float = 5.0,
+    post_sell_settle_s: float = 2.0,
     max_dock_retries: int = 3,
     time_fn: Callable[[], float] = monotonic,
     sleeper: Callable[[float], None] = sleep,
@@ -413,6 +425,7 @@ def haul_loop_two_way(
         boost_settle_s=boost_settle_s,
         deny_retry_delay_s=deny_retry_delay_s,
         mass_lock_boost_delay_s=mass_lock_boost_delay_s,
+        post_sell_settle_s=post_sell_settle_s,
         max_dock_retries=max_dock_retries,
         time_fn=time_fn,
         sleeper=sleeper,

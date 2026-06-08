@@ -258,6 +258,152 @@ class TwoWayHaulLoopTests(unittest.TestCase):
             ],
         )
 
+    def test_post_sell_settle_sleeps_between_sell_and_buy(self) -> None:
+        controls = FakeShipControls()
+        watcher = FakeWatcher([
+            [],
+            [{"event": "Undocked", "StationName": _STATION_1}],
+            [{"event": "Music", "MusicTrack": "NoTrack"}],
+            [{"event": "SupercruiseExit", "BodyType": "Station"}],
+            [],
+            [{"event": "DockingGranted", "LandingPad": 1, "StationName": _STATION_2}],
+            [{"event": "Docked", "StationName": _STATION_2}],
+            [],
+            [{"event": "Undocked", "StationName": _STATION_2}],
+            [{"event": "Music", "MusicTrack": "NoTrack"}],
+            [{"event": "SupercruiseExit", "BodyType": "Station"}],
+            [],
+            [{"event": "DockingGranted", "LandingPad": 1, "StationName": _STATION_1}],
+            [{"event": "Docked", "StationName": _STATION_1}],
+        ])
+        sleep_calls: list[float] = []
+
+        with tempfile.TemporaryDirectory() as tmp:
+            journal_dir = Path(tmp)
+            _write_market(
+                journal_dir,
+                _STATION_1,
+                [
+                    {"Category": "Metals", "Name": "aluminium", "Name_Localised": _CARGO_1, "DemandBracket": 1, "Stock": 1000},
+                    {"Category": "Minerals", "Name": "bertrandite", "Name_Localised": _CARGO_2, "DemandBracket": 1, "Stock": 1000},
+                ],
+            )
+            _write_cargo(
+                journal_dir,
+                [{"Name": "bertrandite", "Count": 64, "Stolen": 0}],
+            )
+            with patch("edap.routines.haul_two_way.market_sell") as market_sell_mock, patch(
+                "edap.routines.haul_two_way.market_buy"
+            ) as market_buy_mock:
+                market_sell_mock.side_effect = lambda controls, watcher, **kwargs: RoutineResult(
+                    action="market_sell",
+                    dispatch=ActionDispatchResult(action="market_sell", status="ok"),
+                )
+                market_buy_mock.side_effect = lambda controls, watcher, **kwargs: RoutineResult(
+                    action="market_buy",
+                    dispatch=ActionDispatchResult(action="market_buy", status="ok"),
+                )
+                haul_loop_two_way(
+                    controls,
+                    watcher,
+                    journal_dir=journal_dir,
+                    station_1=_STATION_1,
+                    station_1_buying=_CARGO_1,
+                    station_1_system=_SYSTEM_1,
+                    station_2=_STATION_2,
+                    station_2_buying=_CARGO_2,
+                    station_2_system=_SYSTEM_2,
+                    iterations=1,
+                    step_delay_s=0.0,
+                    settle_s=0.0,
+                    boost_settle_s=0.0,
+                    post_sell_settle_s=2.5,
+                    dock_timeout_s=30.0,
+                    request_timeout_s=10.0,
+                    undock_timeout_s=10.0,
+                    trade_timeout_s=10.0,
+                    time_fn=_ticking_clock(),
+                    sleeper=lambda s: sleep_calls.append(s),
+                )
+
+        self.assertEqual(sleep_calls.count(2.5), 2)
+
+    def test_post_sell_settle_skipped_when_cargo_empty(self) -> None:
+        controls = FakeShipControls()
+        watcher = FakeWatcher([
+            [],
+            [{"event": "Undocked", "StationName": _STATION_1}],
+            [{"event": "Music", "MusicTrack": "NoTrack"}],
+            [{"event": "SupercruiseExit", "BodyType": "Station"}],
+            [],
+            [{"event": "DockingGranted", "LandingPad": 1, "StationName": _STATION_2}],
+            [{"event": "Docked", "StationName": _STATION_2}],
+            [],
+            [{"event": "Undocked", "StationName": _STATION_2}],
+            [{"event": "Music", "MusicTrack": "NoTrack"}],
+            [{"event": "SupercruiseExit", "BodyType": "Station"}],
+            [],
+            [{"event": "DockingGranted", "LandingPad": 1, "StationName": _STATION_1}],
+            [{"event": "Docked", "StationName": _STATION_1}],
+        ])
+        sleep_calls: list[float] = []
+
+        with tempfile.TemporaryDirectory() as tmp:
+            journal_dir = Path(tmp)
+            _write_market(
+                journal_dir,
+                _STATION_1,
+                [
+                    {"Category": "Metals", "Name": "aluminium", "Name_Localised": _CARGO_1, "DemandBracket": 1, "Stock": 1000},
+                    {"Category": "Minerals", "Name": "bertrandite", "Name_Localised": _CARGO_2, "DemandBracket": 1, "Stock": 1000},
+                ],
+            )
+            _write_cargo(journal_dir, [])
+            with patch("edap.routines.haul_two_way.market_sell") as market_sell_mock, patch(
+                "edap.routines.haul_two_way.market_buy"
+            ) as market_buy_mock:
+                market_sell_mock.side_effect = lambda controls, watcher, **kwargs: RoutineResult(
+                    action="market_sell",
+                    dispatch=ActionDispatchResult(action="market_sell", status="ok"),
+                )
+
+                def fake_buy(controls, watcher, **kwargs):
+                    _write_cargo(
+                        journal_dir,
+                        [{"Name": kwargs["target"].lower(), "Count": 64, "Stolen": 0}],
+                    )
+                    return RoutineResult(
+                        action="market_buy",
+                        dispatch=ActionDispatchResult(action="market_buy", status="ok"),
+                    )
+
+                market_buy_mock.side_effect = fake_buy
+                haul_loop_two_way(
+                    controls,
+                    watcher,
+                    journal_dir=journal_dir,
+                    station_1=_STATION_1,
+                    station_1_buying=_CARGO_1,
+                    station_1_system=_SYSTEM_1,
+                    station_2=_STATION_2,
+                    station_2_buying=_CARGO_2,
+                    station_2_system=_SYSTEM_2,
+                    iterations=1,
+                    step_delay_s=0.0,
+                    settle_s=0.0,
+                    boost_settle_s=0.0,
+                    post_sell_settle_s=2.5,
+                    dock_timeout_s=30.0,
+                    request_timeout_s=10.0,
+                    undock_timeout_s=10.0,
+                    trade_timeout_s=10.0,
+                    time_fn=_ticking_clock(),
+                    sleeper=lambda s: sleep_calls.append(s),
+                )
+
+        # Station 1 sell was skipped (empty cargo), so only the station 2 sell triggers the settle.
+        self.assertEqual(sleep_calls.count(2.5), 1)
+
     def test_rejects_duplicate_stations(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             with self.assertRaisesRegex(RuntimeError, "station_1 and station_2 must differ"):
