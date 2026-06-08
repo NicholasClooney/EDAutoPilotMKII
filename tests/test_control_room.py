@@ -669,6 +669,25 @@ class ControlRoomBindingsTests(unittest.TestCase):
         self.assertEqual(self.app._haul_stats.current_run_started_at, 320.0)
         self.assertEqual(self.app._haul_stats.current_run_profit, -125_000)
 
+    def test_haul_stats_log_ignored_station_1_sell_before_clean_departure(self) -> None:
+        self.app._ship.status = "in_station"
+        self.app._ship.station = "Pawelczyk Dock"
+        self.app._time_fn = lambda: 100.0
+        self.app._start_haul_stats(
+            station_1_buying="Aluminium",
+            station_2_buying="Bertrandite",
+            station_1="Pawelczyk Dock",
+            station_2="Hutton Orbital",
+        )
+
+        self.app._handle_haul_event({"event": "MarketSell", "TotalSale": 400_000}, station_before="Pawelczyk Dock")
+
+        self.assertEqual(self.app._haul_stats.current_run_profit, 0)
+        self.assertIn(
+            "Ignoring station 1 sale for haul stats (discarding profit from prior run).",
+            "\n".join(self.app.logged),
+        )
+
     def test_haul_stats_ignore_partial_resume_until_next_clean_departure(self) -> None:
         self.app._ship.status = "in_supercruise"
         self.app._time_fn = lambda: 50.0

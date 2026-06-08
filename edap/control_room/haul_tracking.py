@@ -11,6 +11,7 @@ class HaulTrackingHost(Protocol):
     _ship: ShipState
     _time_fn: Callable[[], float]
 
+    def _log(self, msg: str) -> None: ...
     def _refresh_haul_stats(self) -> None: ...
     def _announce_tts(self, message_id: AnnouncementId, /, **values: object) -> None: ...
 
@@ -136,5 +137,10 @@ def handle_haul_event(
             stats.current_run_profit += total_sale
             if stats.docked_back_at_station_1:
                 finalize_completed_haul_run(app)
+        elif at_station_1:
+            app._log(
+                "[dim]Ignoring station 1 sale for haul stats "
+                "(discarding profit from prior run).[/]"
+            )
 
     app._refresh_haul_stats()

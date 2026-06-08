@@ -21,6 +21,7 @@ Last updated: 2026-06-08
 - Two-way haul clear-of-station waits now default to 10 minutes; if the `NoTrack` music event still never arrives after undock, the haul aborts instead of continuing, logs a replay/`ctrl-r` recovery hint, and keeps the spoken alert short.
 - Control-room haul dispatch now forwards the configured undock and clear-of-station timeouts into the two-way haul routine, so live haul progress no longer falls back to the stale `60s` `NoTrack` wait.
 - Control-room haul telemetry now matches the two-way route flow: it carries the station-1 buy cost into the next clean departure, counts both station sells plus the station-2 buy, and closes a run when the return cargo is sold at station 1 instead of waiting for the next undock.
+- When haul telemetry ignores a station-1 sale because tracking has not yet reached a clean departure, control room now logs that the sale profit is being discarded from the prior run instead of dropping it silently.
 - Control room: live Textual UI with ship status, market panel, haul stats, replay/history, persisted state, and routine dispatch.
 - Control room: live Textual UI with ship status, market panel, haul stats, replay/history, persisted state, routine dispatch, and queued cross-platform TTS announcements for haul/navigation milestones.
 - TTS/config: announcement IDs are typed in code, while default phrase text now lives in `defaults/tts.toml` and merges with user `config.toml` overrides under `[tts]`.
