@@ -1,16 +1,37 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from enum import Enum, auto
 from pathlib import Path
 from time import monotonic, sleep
 from typing import Callable
 
+from edap.actions import ActionDispatchResult
 from edap.routines._base import RoutineResult, SupportsHaulControls, SupportsPollEvents
 from edap.routines.docking import _undock_until_undocked, _wait_for_clear_of_station, dock
 from edap.routines.escape import escape_mass_lock
 from edap.routines.galaxy_map import set_gal_map_destination
 from edap.routines.market import market_buy, market_sell
+
+
+def _read_cargo_json(journal_dir: Path) -> list[dict]:
+    cargo_path = journal_dir / "Cargo.json"
+    try:
+        with cargo_path.open() as fh:
+            data = json.load(fh)
+        return data.get("Inventory", [])
+    except (OSError, json.JSONDecodeError):
+        return []
+
+
+def _sellable_cargo(inventory: list[dict]) -> list[dict]:
+    return [
+        item for item in inventory
+        if item.get("Count", 0) > 0
+        and item.get("Stolen", 0) == 0
+        and "MissionID" not in item
+    ]
 
 
 class Phase(Enum):
@@ -71,6 +92,20 @@ def _run_market_sell(
     leg: StationLeg,
     next_phase: Phase,
 ) -> tuple[RoutineResult, Phase]:
+    if not _sellable_cargo(_read_cargo_json(ctx.journal_dir)):
+        if ctx.progress_fn is not None:
+            ctx.progress_fn(f"Cargo hold empty - skipping {leg.label} sell.")
+        return (
+            RoutineResult(
+                action="market_sell",
+                dispatch=ActionDispatchResult(
+                    action="market_sell",
+                    status="ok",
+                    reason="cargo hold empty",
+                ),
+            ),
+            next_phase,
+        )
     if ctx.progress_fn is not None:
         ctx.progress_fn(f"Selling {leg.sell_commodity} at {leg.label} (MAX)...")
     result = market_sell(

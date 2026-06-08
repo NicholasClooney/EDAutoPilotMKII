@@ -36,6 +36,13 @@ def _write_market(journal_dir: Path, station_name: str, items: list[dict]) -> No
     )
 
 
+def _write_cargo(journal_dir: Path, inventory: list[dict]) -> None:
+    (journal_dir / "Cargo.json").write_text(
+        json.dumps({"Inventory": inventory}),
+        encoding="utf-8",
+    )
+
+
 class TwoWayHaulLoopTests(unittest.TestCase):
     def test_one_iteration_happy_path(self) -> None:
         controls = FakeShipControls()
@@ -66,6 +73,10 @@ class TwoWayHaulLoopTests(unittest.TestCase):
                     {"Category": "Metals", "Name": "aluminium", "Name_Localised": _CARGO_1, "DemandBracket": 1, "Stock": 1000},
                     {"Category": "Minerals", "Name": "bertrandite", "Name_Localised": _CARGO_2, "DemandBracket": 1, "Stock": 1000},
                 ],
+            )
+            _write_cargo(
+                journal_dir,
+                [{"Name": "bertrandite", "Count": 64, "Stolen": 0}],
             )
             with patch("edap.routines.haul_two_way.market_sell") as market_sell_mock, patch(
                 "edap.routines.haul_two_way.market_buy"
@@ -162,6 +173,90 @@ class TwoWayHaulLoopTests(unittest.TestCase):
             )
 
         self.assertEqual(result.dispatch.status, "ok")
+
+    def test_skips_sell_when_cargo_empty(self) -> None:
+        controls = FakeShipControls()
+        market_calls: list[tuple[str, str]] = []
+        watcher = FakeWatcher([
+            [],
+            [{"event": "Undocked", "StationName": _STATION_1}],
+            [{"event": "Music", "MusicTrack": "NoTrack"}],
+            [{"event": "SupercruiseExit", "BodyType": "Station"}],
+            [],
+            [{"event": "DockingGranted", "LandingPad": 1, "StationName": _STATION_2}],
+            [{"event": "Docked", "StationName": _STATION_2}],
+            [],
+            [{"event": "Undocked", "StationName": _STATION_2}],
+            [{"event": "Music", "MusicTrack": "NoTrack"}],
+            [{"event": "SupercruiseExit", "BodyType": "Station"}],
+            [],
+            [{"event": "DockingGranted", "LandingPad": 1, "StationName": _STATION_1}],
+            [{"event": "Docked", "StationName": _STATION_1}],
+        ])
+
+        with tempfile.TemporaryDirectory() as tmp:
+            journal_dir = Path(tmp)
+            _write_market(
+                journal_dir,
+                _STATION_1,
+                [
+                    {"Category": "Metals", "Name": "aluminium", "Name_Localised": _CARGO_1, "DemandBracket": 1, "Stock": 1000},
+                    {"Category": "Minerals", "Name": "bertrandite", "Name_Localised": _CARGO_2, "DemandBracket": 1, "Stock": 1000},
+                ],
+            )
+            _write_cargo(journal_dir, [])
+            with patch("edap.routines.haul_two_way.market_sell") as market_sell_mock, patch(
+                "edap.routines.haul_two_way.market_buy"
+            ) as market_buy_mock:
+                market_sell_mock.side_effect = lambda controls, watcher, **kwargs: (
+                    market_calls.append(("sell", kwargs["target"])) or RoutineResult(
+                        action="market_sell",
+                        dispatch=ActionDispatchResult(action="market_sell", status="ok"),
+                    )
+                )
+                def fake_buy(controls, watcher, **kwargs):
+                    market_calls.append(("buy", kwargs["target"]))
+                    _write_cargo(
+                        journal_dir,
+                        [{"Name": kwargs["target"].lower(), "Count": 64, "Stolen": 0}],
+                    )
+                    return RoutineResult(
+                        action="market_buy",
+                        dispatch=ActionDispatchResult(action="market_buy", status="ok"),
+                    )
+
+                market_buy_mock.side_effect = fake_buy
+                result = haul_loop_two_way(
+                    controls,
+                    watcher,
+                    journal_dir=journal_dir,
+                    station_1=_STATION_1,
+                    station_1_buying=_CARGO_1,
+                    station_1_system=_SYSTEM_1,
+                    station_2=_STATION_2,
+                    station_2_buying=_CARGO_2,
+                    station_2_system=_SYSTEM_2,
+                    iterations=1,
+                    step_delay_s=0.0,
+                    settle_s=0.0,
+                    boost_settle_s=0.0,
+                    dock_timeout_s=30.0,
+                    request_timeout_s=10.0,
+                    undock_timeout_s=10.0,
+                    trade_timeout_s=10.0,
+                    time_fn=_ticking_clock(),
+                    sleeper=lambda _: None,
+                )
+
+        self.assertEqual(result.dispatch.status, "ok")
+        self.assertEqual(
+            market_calls,
+            [
+                ("buy", _CARGO_1),
+                ("sell", _CARGO_1),
+                ("buy", _CARGO_2),
+            ],
+        )
 
     def test_rejects_duplicate_stations(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
