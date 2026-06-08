@@ -27,8 +27,9 @@ class TTSHelpersTests(unittest.TestCase):
                 title="captain",
                 disabled_messages=("arrival",),
                 phrases={
-                    "arrival": "Arrived in {system_name}.",
+                    "arrival": "Arrived.",
                     "station_cleared": "Ready to jump, {title}.",
+                    "haul_aborted": "Haul aborted.",
                 },
             ),
             platform_name="macos",
@@ -38,6 +39,7 @@ class TTSHelpersTests(unittest.TestCase):
 
         announcer.announce(AnnouncementId.ARRIVAL, system_name="Achenar")
         announcer.announce(AnnouncementId.STATION_CLEARED)
+        announcer.announce(AnnouncementId.HAUL_ABORTED)
         announcer.close()
 
-        self.assertEqual(backend.spoken, ["Ready to jump, captain."])
+        self.assertEqual(backend.spoken, ["Ready to jump, captain.", "Haul aborted."])

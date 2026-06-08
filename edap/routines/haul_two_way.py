@@ -452,8 +452,15 @@ def _undock_and_route(
         progress_fn=ctx.progress_fn,
         pending_events=pending_events,
     )
-    if clear_result.dispatch.status != "ok" and ctx.progress_fn is not None:
-        ctx.progress_fn(f"Warning: {clear_result.dispatch.reason}; continuing with mass-lock escape")
+    if clear_result.dispatch.status != "ok":
+        if ctx.progress_fn is not None:
+            ctx.progress_fn(
+                "Error: "
+                f"{clear_result.dispatch.reason}; haul aborted. You can resume haul with replay / ctrl-r."
+            )
+        if ctx.announce_fn is not None:
+            ctx.announce_fn(AnnouncementId.HAUL_ABORTED)
+        return clear_result, next_phase
     escape_mass_lock(
         ctx.controls,
         journal_dir=ctx.journal_dir,
@@ -569,6 +576,8 @@ def _run_transit(
         sleeper=ctx.sleeper,
         progress_fn=ctx.progress_fn,
         pending_events=pending_events,
+        announce_fn=ctx.announce_fn,
+        announce_station_name=destination_leg.station,
     )
     return result, next_phase
 

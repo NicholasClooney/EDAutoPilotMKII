@@ -11,3 +11,6 @@ _This is the rolling short-form log for recent sessions. Keep entries concise an
 - Two-way haul now opens the left external/nav panel on hyperspace arrival by default, with buffered journal handoff into docking so arrival detection does not consume `SupercruiseExit`/`Docked` events.
 - Added `controls.haul_two_way_nav_panel_open_delay_seconds` with a default 3.0-second wait before the post-jump nav-panel open.
 - Added queued TTS announcements for haul/control-room milestones, with typed announcement IDs in code and repo-shipped default phrases in `defaults/tts.toml` merged with user `[tts]` overrides from `config.toml`.
+- Raised the default undock `NoTrack`/clear-station timeout to 600 seconds and changed two-way haul departures to abort, log, and announce a resumable stop instead of continuing blind after the timeout.
+- Shortened default TTS jump/arrival phrases to avoid speaking long system names: "Jumping to the next system." and "Arrived."
+- Shortened the haul-aborted TTS line to just "Haul aborted." and moved the recovery guidance into the haul log message: `replay / ctrl-r`.

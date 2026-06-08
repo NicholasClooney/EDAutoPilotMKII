@@ -46,13 +46,14 @@ def _make_config(journal_dir: Path) -> AppConfig:
             galaxy_map_settle_seconds=2.0,
             haul_dock_timeout_seconds=600.0,
             undock_timeout_seconds=30.0,
-            undock_no_track_timeout_seconds=60.0,
+            undock_no_track_timeout_seconds=600.0,
             mass_lock_boost_delay_seconds=5.0,
             market_nav_delay_seconds=0.1,
             market_trade_max_attempts=3,
             haul_post_sell_settle_seconds=2.0,
             haul_two_way_auto_hyperspace_engage=True,
             haul_two_way_open_nav_panel_after_hyperspace_arrival=True,
+            haul_two_way_nav_panel_open_delay_seconds=3.0,
         ),
         screen=ScreenConfig(
             resolution_width=1920,
@@ -687,15 +688,12 @@ class ControlRoomBindingsTests(unittest.TestCase):
             self.app._tts.calls,
         )
 
-    def test_handle_event_announces_destination_and_docking(self) -> None:
+    def test_handle_event_announces_destination_only(self) -> None:
         self.app._tts = _FakeTTS()
-        self.app._ship.station = "Pawelczyk Dock"
 
         self.app._handle_event({"event": "FSDTarget", "Name": "Achenar"})
-        self.app._handle_event({"event": "DockingRequested", "StationName": "Hutton Orbital"})
 
         self.assertIn((AnnouncementId.DESTINATION_SET, {"system_name": "Achenar"}), self.app._tts.calls)
-        self.assertIn((AnnouncementId.DOCKING_REQUEST, {"station_name": "Hutton Orbital"}), self.app._tts.calls)
 
 
 class ControlRoomDispatchTests(unittest.TestCase):

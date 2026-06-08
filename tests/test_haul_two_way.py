@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 from edap.routines.haul_two_way import Phase, haul_loop_two_way
 from edap.routines._base import ActionDispatchResult, RoutineResult
+from edap.tts import AnnouncementId
 from tests.fakes import FakeShipControls, FakeWatcher
 
 _STATION_1 = "Pawelczyk Dock"
@@ -807,6 +808,60 @@ class TwoWayHaulLoopTests(unittest.TestCase):
 
         self.assertEqual(result.dispatch.status, "ok")
         self.assertEqual(market_calls[0], ("buy", _CARGO_2))
+
+    def test_undock_aborts_haul_on_no_track_timeout_and_logs_replay_hint(self) -> None:
+        controls = FakeShipControls()
+        watcher = FakeWatcher([
+            [],
+            [{"event": "Undocked", "StationName": _STATION_1}],
+        ])
+        announcements: list[tuple[object, dict[str, object]]] = []
+        messages: list[str] = []
+
+        with tempfile.TemporaryDirectory() as tmp:
+            journal_dir = Path(tmp)
+            _write_market(
+                journal_dir,
+                _STATION_1,
+                [
+                    {"Category": "Metals", "Name": "aluminium", "Name_Localised": _CARGO_1, "DemandBracket": 1, "Stock": 1000},
+                    {"Category": "Minerals", "Name": "bertrandite", "Name_Localised": _CARGO_2, "DemandBracket": 1, "Stock": 1000},
+                ],
+            )
+            _write_cargo(journal_dir, [])
+
+            result = haul_loop_two_way(
+                controls,
+                watcher,
+                journal_dir=journal_dir,
+                station_1=_STATION_1,
+                station_1_buying=_CARGO_1,
+                station_1_system=_SYSTEM_1,
+                station_2=_STATION_2,
+                station_2_buying=_CARGO_2,
+                station_2_system=_SYSTEM_2,
+                iterations=1,
+                start_phase=Phase.UNDOCK_STATION_1,
+                step_delay_s=0.0,
+                settle_s=0.0,
+                boost_settle_s=0.0,
+                dock_timeout_s=30.0,
+                request_timeout_s=10.0,
+                undock_timeout_s=10.0,
+                undock_no_track_timeout_s=0.0,
+                trade_timeout_s=10.0,
+                time_fn=_ticking_clock(),
+                sleeper=lambda _: None,
+                progress_fn=messages.append,
+                announce_fn=lambda message_id, **values: announcements.append((message_id, values)),
+            )
+
+        self.assertEqual(result.dispatch.status, "error")
+        self.assertTrue(any("replay / ctrl-r" in message for message in messages))
+        self.assertIn((AnnouncementId.HAUL_ABORTED, {}), announcements)
+        actions = [call["action"] for call in controls.calls]
+        self.assertIn("GalaxyMapOpen", actions)
+        self.assertNotIn("UseBoostJuice", actions)
 
     def test_skips_sell_when_cargo_empty(self) -> None:
         controls = FakeShipControls()

@@ -43,6 +43,7 @@ class LoadConfigTests(unittest.TestCase):
             self.assertEqual(config.controls.galaxy_map_settle_seconds, 2.0)
             self.assertEqual(config.controls.haul_dock_timeout_seconds, 600.0)
             self.assertEqual(config.controls.undock_timeout_seconds, 30.0)
+            self.assertEqual(config.controls.undock_no_track_timeout_seconds, 600.0)
             self.assertTrue(config.controls.haul_two_way_auto_hyperspace_engage)
             self.assertTrue(config.controls.haul_two_way_open_nav_panel_after_hyperspace_arrival)
             self.assertEqual(config.controls.haul_two_way_nav_panel_open_delay_seconds, 3.0)
@@ -85,6 +86,10 @@ station_cleared = "Station cleared, {title}."
             self.assertEqual(config.tts.title, "captain")
             self.assertEqual(config.tts.disabled_messages, ("arrival",))
             self.assertEqual(config.tts.phrases["station_cleared"], "Station cleared, {title}.")
+            self.assertEqual(
+                config.tts.phrases["haul_aborted"],
+                "Haul aborted.",
+            )
             self.assertEqual(config.tts.phrases["destination_set"], "Setting destination to {system_name}.")
 
     def test_defaults_runtime_platform_from_host_when_omitted(self) -> None:

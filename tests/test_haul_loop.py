@@ -468,7 +468,7 @@ class DetectPhaseResumeIntegrationTest(unittest.TestCase):
         self.assertIn("GalaxyMapOpen", actions)
         self.assertNotIn("HeadLookReset", actions)
 
-    def test_run_undock_sell_sets_route_before_escape_and_soft_fails_no_track(self) -> None:
+    def test_run_undock_sell_aborts_on_no_track_timeout(self) -> None:
         messages: list[str] = []
         controls = FakeShipControls()
         watcher = FakeWatcher([
@@ -511,11 +511,13 @@ class DetectPhaseResumeIntegrationTest(unittest.TestCase):
             )
             result, next_phase = _run_undock_sell(ctx)
 
-        self.assertEqual(next_phase, Phase.TRANSIT_TO_BUY)
-        self.assertEqual(result.dispatch.status, "ok")
+        self.assertIsNone(next_phase)
+        self.assertEqual(result.dispatch.status, "error")
         actions = [call["action"] for call in controls.calls]
-        self.assertLess(actions.index("GalaxyMapOpen"), actions.index("SetSpeed100"))
-        self.assertTrue(any("continuing with mass-lock escape" in message for message in messages))
+        self.assertIn("GalaxyMapOpen", actions)
+        self.assertNotIn("SetSpeed100", actions)
+        self.assertNotIn("UseBoostJuice", actions)
+        self.assertTrue(any("replay / ctrl-r" in message for message in messages))
 
 
 class SellPhaseNarrowedToTargetTest(unittest.TestCase):

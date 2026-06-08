@@ -14,6 +14,7 @@ from edap.config import TTSConfig
 class AnnouncementId(str, Enum):
     DESTINATION_SET = "destination_set"
     STATION_CLEARED = "station_cleared"
+    HAUL_ABORTED = "haul_aborted"
     BUYING_CARGO = "buying_cargo"
     SELLING_CARGO = "selling_cargo"
     SALE_PROFIT = "sale_profit"

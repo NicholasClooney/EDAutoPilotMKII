@@ -18,6 +18,7 @@ Last updated: 2026-06-08
 - Two-way haul transit resume now distinguishes “already dropped near destination” from “docking already requested/granted”: it skips the extra `SupercruiseExit` wait in the first case, and waits for `Docked` instead of re-requesting docking in the second.
 - Two-way haul departures now auto-tap raw key `k` after mass lock clears to engage hyperspace FSD by default; `controls.haul_two_way_auto_hyperspace_engage` disables it when needed.
 - Two-way haul transit now opens the left external panel on hyperspace arrival by default so the nav page is ready for station approach, after a configurable default 3-second delay; `controls.haul_two_way_open_nav_panel_after_hyperspace_arrival` and `controls.haul_two_way_nav_panel_open_delay_seconds` control that behavior.
+- Two-way haul clear-of-station waits now default to 10 minutes; if the `NoTrack` music event still never arrives after undock, the haul aborts instead of continuing, logs a replay/`ctrl-r` recovery hint, and keeps the spoken alert short.
 - Control room: live Textual UI with ship status, market panel, haul stats, replay/history, persisted state, and routine dispatch.
 - Control room: live Textual UI with ship status, market panel, haul stats, replay/history, persisted state, routine dispatch, and queued cross-platform TTS announcements for haul/navigation milestones.
 - TTS/config: announcement IDs are typed in code, while default phrase text now lives in `defaults/tts.toml` and merges with user `config.toml` overrides under `[tts]`.
