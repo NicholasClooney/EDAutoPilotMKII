@@ -564,10 +564,6 @@ class ControlRoomApp(App[None]):
             system_name = str(ev.get("Name", "")).strip()
             if system_name:
                 self._announce_tts(AnnouncementId.DESTINATION_SET, system_name=system_name)
-        elif event == "DockingRequested":
-            station_name = str(ev.get("StationName", "")).strip() or str(self._ship.station or "").strip()
-            if station_name:
-                self._announce_tts(AnnouncementId.DOCKING_REQUEST, station_name=station_name)
         elif event == "Docked":
             self._announce_tts(AnnouncementId.DOCKING_COMPLETE)
         elif event == "Undocked" and station_before:

@@ -17,6 +17,7 @@ from edap.routines._base import (
     _is_undocked_event,
     _wait_for_event_with_pending,
 )
+from edap.tts import AnnouncementId
 
 
 def station_refuel_menu_sequence(
@@ -178,6 +179,8 @@ def dock(
     sleeper: Callable[[float], None] = sleep,
     progress_fn: Callable[[str], None] | None = None,
     pending_events: list[dict[str, object]] | None = None,
+    announce_fn: Callable[..., None] | None = None,
+    announce_station_name: str = "",
 ) -> RoutineResult:
     if max_retries < 1:
         raise ValueError("max_retries must be at least 1")
@@ -236,6 +239,8 @@ def dock(
 
     request_event: dict[str, object] | None = None
     zero_dispatch: ActionDispatchResult | None = None
+    if announce_fn is not None and announce_station_name:
+        announce_fn(AnnouncementId.DOCKING_REQUEST, station_name=announce_station_name)
     for attempt in range(1, max_retries + 1):
         if progress_fn is not None:
             progress_fn(f"Sending dock request (attempt {attempt}/{max_retries})...")

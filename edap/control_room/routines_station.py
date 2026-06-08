@@ -27,6 +27,8 @@ def cmd_dock(app: RoutineHost, *, skip_delay: bool = False) -> None:
             step_delay_s=step_delay,
             sleeper=sleeper,
             progress_fn=progress,
+            announce_fn=app._announce_tts,
+            announce_station_name=app._ship.station or "",
         ),
     )
 

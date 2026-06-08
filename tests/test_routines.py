@@ -22,6 +22,7 @@ from edap.routines import (
     station_refuel_menu_sequence,
     undock,
 )
+from edap.tts import AnnouncementId
 from tests.fakes import FakeShipControls, FakeWatcher
 
 
@@ -480,6 +481,46 @@ class RoutinesTests(unittest.TestCase):
         self.assertEqual(result.dispatch.status, "ok")
         self.assertEqual(result.trigger_event, {"event": "Docked", "StationName": "Big Station"})
         self.assertIn(5.0, sleep_calls)
+
+    def test_dock_announces_request_once_before_retries(self) -> None:
+        controls = FakeShipControls(
+            set_speed_zero_result=ActionDispatchResult(
+                action="SetSpeedZero",
+                status="ok",
+                binding=NormalizedBinding(key="x", modifier=None),
+            )
+        )
+        watcher = FakeWatcher(
+            [
+                [],
+                [{"event": "DockingDenied", "Reason": "TooLarge", "StationName": "Big Station"}],
+                [{"event": "DockingGranted", "LandingPad": 1, "StationName": "Big Station"}],
+                [{"event": "Docked", "StationName": "Big Station"}],
+            ]
+        )
+        time_values = iter([0.0, 0.1, 0.1, 0.2, 0.2, 0.3])
+        announcements: list[tuple[object, dict[str, object]]] = []
+
+        result = dock(
+            controls,
+            watcher,
+            wait_for_supercruise_exit=False,
+            auto_refuel=False,
+            max_retries=2,
+            request_timeout_s=10.0,
+            dock_timeout_s=60.0,
+            deny_retry_delay_s=5.0,
+            time_fn=lambda: next(time_values),
+            sleeper=lambda _: None,
+            announce_fn=lambda message_id, **values: announcements.append((message_id, values)),
+            announce_station_name="Big Station",
+        )
+
+        self.assertEqual(result.dispatch.status, "ok")
+        self.assertEqual(
+            announcements,
+            [(AnnouncementId.DOCKING_REQUEST, {"station_name": "Big Station"})],
+        )
 
     def test_dock_can_skip_supercruise_exit_and_chain_refuel(self) -> None:
         controls = FakeShipControls(
