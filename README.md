@@ -1,6 +1,6 @@
 # EDAutopilot MK II
 
-macOS-first Elite Dangerous automation tooling for CrossOver, with future Windows compatibility kept as a constraint rather than the current target.
+macOS-first Elite Dangerous automation tooling for CrossOver, with Windows input/control-room support now restored in the active runtime.
 
 The current operator surface is [`control_room.py`](control_room.py). The project is not a full autopilot yet; it is a live runtime and routine stack built around journal parsing, bindings lookup, synthetic input, and early workflow automation.
 
@@ -66,6 +66,7 @@ automation will not navigate the map menus correctly.
 ## Docs Map
 
 - [docs/getting-started/quickstart.md](docs/getting-started/quickstart.md)
+  Includes current macOS and Windows setup paths.
 - [docs/operators/control-room.md](docs/operators/control-room.md)
 - [docs/operators/manual-journal-routine-testing.md](docs/operators/manual-journal-routine-testing.md)
 - [docs/diagnostics/cli-reference.md](docs/diagnostics/cli-reference.md)

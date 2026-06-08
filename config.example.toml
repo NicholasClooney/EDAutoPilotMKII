@@ -60,7 +60,9 @@ right = 0.5
 bottom = 0.9375
 
 [runtime]
-platform = "macos"
+# Optional override. When omitted, the runtime defaults to the host OS:
+# macOS -> "macos", Windows -> "windows".
+# Set this explicitly only when you need to override or make the mode obvious in shared configs.
 debug = true
 
 [control_room]

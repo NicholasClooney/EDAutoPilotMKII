@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+import sys
 import tomllib
 
 
@@ -10,6 +11,17 @@ EXAMPLE_CONFIG_PATH = Path("config.example.toml")
 
 VALID_PLATFORMS = {"macos", "windows"}
 VALID_CAPTURE_MODES = {"fullscreen", "region"}
+
+
+def default_runtime_platform() -> str:
+    if sys.platform == "darwin":
+        return "macos"
+    if sys.platform.startswith("win"):
+        return "windows"
+    raise ConfigError(
+        "Config value `runtime.platform` must be set explicitly on this host. "
+        "Supported runtime values are: macos, windows."
+    )
 
 
 @dataclass(frozen=True)
@@ -314,7 +326,7 @@ def load_config(path: Path | str = DEFAULT_CONFIG_PATH) -> AppConfig:
             ),
         ),
         runtime=RuntimeConfig(
-            platform=_string(runtime, "platform", "macos"),
+            platform=_string(runtime, "platform", default_runtime_platform()),
             debug=_boolean(runtime, "debug", True),
         ),
         control_room=ControlRoomConfig(

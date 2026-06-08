@@ -3,9 +3,10 @@ from __future__ import annotations
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
+from unittest.mock import patch
 
 from edap.capture import build_capture_layout
-from edap.config import ConfigError, load_config
+from edap.config import ConfigError, default_runtime_platform, load_config
 
 
 def _write_config(path: Path, content: str) -> None:
@@ -30,7 +31,8 @@ class LoadConfigTests(unittest.TestCase):
 """.strip(),
             )
 
-            config = load_config(config_path)
+            with patch("edap.config.default_runtime_platform", return_value="macos"):
+                config = load_config(config_path)
 
             self.assertIsNone(config.paths.journal_dir)
             self.assertIsNone(config.paths.bindings_file)
@@ -48,6 +50,63 @@ class LoadConfigTests(unittest.TestCase):
             self.assertEqual(config.control_room.state_file, Path(".control_room_state.json"))
             self.assertEqual(config.control_room.history_limit, 20)
             self.assertEqual(config.control_room.command_delay_seconds, 5.0)
+
+    def test_defaults_runtime_platform_from_host_when_omitted(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            config_path = temp_path / "config.toml"
+            _write_config(
+                config_path,
+                """
+[paths]
+
+[controls]
+
+[screen]
+
+[runtime]
+""".strip(),
+            )
+
+            with patch("edap.config.default_runtime_platform", return_value="windows"):
+                config = load_config(config_path)
+
+            self.assertEqual(config.runtime.platform, "windows")
+
+    def test_rejects_omitted_runtime_platform_on_unsupported_host(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            config_path = temp_path / "config.toml"
+            _write_config(
+                config_path,
+                """
+[paths]
+
+[controls]
+
+[screen]
+
+[runtime]
+""".strip(),
+            )
+
+            with patch(
+                "edap.config.default_runtime_platform",
+                side_effect=ConfigError("Config value `runtime.platform` must be set explicitly on this host."),
+            ):
+                with self.assertRaisesRegex(ConfigError, "runtime.platform"):
+                    load_config(config_path)
+
+    def test_default_runtime_platform_maps_supported_hosts(self) -> None:
+        with patch("edap.config.sys.platform", "darwin"):
+            self.assertEqual(default_runtime_platform(), "macos")
+        with patch("edap.config.sys.platform", "win32"):
+            self.assertEqual(default_runtime_platform(), "windows")
+
+    def test_default_runtime_platform_rejects_unsupported_host(self) -> None:
+        with patch("edap.config.sys.platform", "linux"):
+            with self.assertRaisesRegex(ConfigError, "runtime.platform"):
+                default_runtime_platform()
 
     def test_rejects_non_positive_continuous_hold_setting(self) -> None:
         with TemporaryDirectory() as temp_dir:
