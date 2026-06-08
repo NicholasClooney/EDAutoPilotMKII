@@ -15,6 +15,7 @@ Last updated: 2026-06-08
 - Journal/runtime: journal tailing, bindings lookup, runtime construction, and shared platform seams are working.
 - Routines: `jump`, `dock`, `undock`, market buy/sell, galaxy-map destination setting, throttle zeroing, and the current two-station haul loop all exist behind `edap/routines/`.
 - Two-way haul startup now detects the active station/phase from journal position, `Cargo.json`, and `Market.json` fallback data, so a station-2 start no longer blindly runs station-1 actions first.
+- Two-way haul transit resume now treats a recent `SupercruiseExit` at a station as “already dropped near destination” and skips waiting for a second exit event before docking.
 - Control room: live Textual UI with ship status, market panel, haul stats, replay/history, persisted state, and routine dispatch.
 - Platform scope: macOS + CrossOver is the only live-validated operator path. Windows and Linux input/runtime paths exist with unit-test and CI coverage, but not live validation.
 - CI: cross-platform unittest workflow exists in GitHub Actions, and a timing guard now enforces a 10-second ceiling on `tests/test_haul_loop.py`.
@@ -34,6 +35,7 @@ Last updated: 2026-06-08
 
 ## Handoff Links
 
+- Rolling recent session notes: [session-log.md](session-log.md)
 - Archive for detailed validation notes, longer capability status, and historical handoff detail: [status-archive.md](status-archive.md)
 - Maintained plans: [plans/](plans/)
 - Operator workflows: [operators/](operators/)
@@ -42,5 +44,7 @@ Last updated: 2026-06-08
 ## Maintenance Policy
 
 - Keep this file high-signal only: current status, active capabilities, key caveats, immediate next steps, and minimal handoff context.
+- Put short-lived session detail in [session-log.md](session-log.md). Keep that file at or under 20 lines. If a new entry would exceed the limit, append the full current log to [status-archive.md](status-archive.md), reset `session-log.md` to a fresh empty log template, then write the new entry.
 - Put verbose validation logs, session chronology, long capability matrices, refactor TODOs, and speculative backlog notes in [status-archive.md](status-archive.md) or a more specific supporting doc.
+- Do not read [status-archive.md](status-archive.md) during normal work unless the user explicitly asks for archive/history detail or newer compact docs are insufficient to unblock the task.
 - If a section starts reading like a changelog or investigation log, move that detail out of `STATUS.md` and leave a one-line summary plus a link.

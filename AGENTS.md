@@ -23,6 +23,12 @@ See [docs/STATUS.md](docs/STATUS.md) for the current port status, what is stubbe
 - Update `docs/STATUS.md` at the end of any session that changes project understanding, port status, completed work, open gaps, or recommended next steps.
 - Keep it concise and current so the next agent can resume from it directly.
 
+Use [docs/session-log.md](docs/session-log.md) for concise rolling session notes.
+
+- Append short session entries to `docs/session-log.md` when the detail is useful for future operators/agents but too transient or verbose for `docs/STATUS.md`.
+- Keep `docs/session-log.md` bounded to at most 20 lines. If a new entry would push it past that limit, append the full current contents of `docs/session-log.md` to `docs/status-archive.md` and then reset `docs/session-log.md` to a fresh empty log template before writing the new entry.
+- Treat `docs/status-archive.md` as cold storage. Do not open or read it during normal work unless the user explicitly asks for archive/history detail or you are blocked and need older context that is not available in `docs/STATUS.md` or `docs/session-log.md`.
+
 ## Testing
 
 - Use `uv run python3 -m unittest` to run tests, not pytest.
@@ -63,6 +69,7 @@ When work is delegated to agents:
 After an agent finishes:
 
 - capture the result in `docs/STATUS.md` if it changes project understanding, status, or next steps
+- capture concise operational detail in `docs/session-log.md` when it is useful to retain but does not belong in `docs/STATUS.md`
 - update any deeper supporting docs only when the change needs more detail than `docs/STATUS.md` should carry
 - integrate and commit the work atomically in logically grouped commits
 - when bringing work back from a branch or worktree, keep history linear: prefer cherry-pick or rebase, and do not create merge commits
