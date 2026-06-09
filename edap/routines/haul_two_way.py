@@ -502,6 +502,24 @@ def _run_market_buy(
     return result, next_phase
 
 
+def _should_stop_before_station_1_buy(
+    phase: Phase,
+    stop_requested_fn: Callable[[], bool] | None,
+) -> bool:
+    return phase == Phase.AT_STATION_1_BUY and stop_requested_fn is not None and stop_requested_fn()
+
+
+def _stopped_routine_result(reason: str) -> RoutineResult:
+    return RoutineResult(
+        action="haul_loop",
+        dispatch=ActionDispatchResult(
+            action="haul_loop",
+            status="ok",
+            reason=reason,
+        ),
+    )
+
+
 def _undock_and_route(
     ctx: _HaulCtx,
     *,
@@ -867,6 +885,10 @@ def haul_loop_two_way(
         first_cycle = False
 
         while True:
+            if _should_stop_before_station_1_buy(phase, stop_requested_fn):
+                if progress_fn is not None:
+                    progress_fn("Stop requested at station 1; halting before station 1 buy.")
+                return last_result or _stopped_routine_result("stopped before station 1 buy")
             result, next_phase = _PHASE_RUNNERS[phase](ctx)
             if result is not None:
                 last_result = result
@@ -879,8 +901,7 @@ def haul_loop_two_way(
             ):
                 if progress_fn is not None:
                     progress_fn("Stop requested at cycle boundary; halting before station 1 buy.")
-                assert last_result is not None
-                return last_result
+                return last_result or _stopped_routine_result("stopped at station 1 cycle boundary")
             if phase == Phase.TRANSIT_TO_STATION_1:
                 break
             phase = next_phase
