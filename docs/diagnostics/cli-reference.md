@@ -21,6 +21,9 @@ uv run python3 check_bindings.py
 uv run python3 check_bindings.py --verbose
 uv run python3 check_bindings.py --json
 uv run python3 set_binding.py PitchDownButton --show
+uv run python3 bindings_files.py apply-default ControlPad
+uv run python3 bindings_files.py port-default KeyboardMouseOnly ControlPad --dry-run
+uv run python3 bindings_files.py port-default KeyboardMouseOnly ControlPad
 ```
 
 See [bindings-reference.md](bindings-reference.md) for the action names the runtime depends on.

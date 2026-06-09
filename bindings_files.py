@@ -24,8 +24,10 @@ from edap.bindings_inventory import (
     list_backup_files,
     list_bindings_files,
     list_default_preset_files,
+    port_keyboard_changes_to_preset,
     restore_bindings_file,
 )
+from edap.binding_names import format_binding_action_hint
 from edap.config import ConfigError, DEFAULT_CONFIG_PATH
 from edap.runtime import build_runtime_context, load_config_with_fallback
 
@@ -102,6 +104,32 @@ def main() -> int:
         default=str(DEFAULT_BACKUP_DIR),
         help="Backup destination directory used before overwriting the detected bindings file",
     )
+    port_default_parser = subparsers.add_parser(
+        "port-default",
+        help="Port keyboard changes from one shipped preset base onto another shipped preset base",
+    )
+    port_default_parser.add_argument(
+        "source_base",
+        nargs="?",
+        default=None,
+        help="Source preset filename, preset name, path, or list number; omit to choose interactively",
+    )
+    port_default_parser.add_argument(
+        "target_base",
+        nargs="?",
+        default=None,
+        help="Target preset filename, preset name, path, or list number; omit to choose interactively",
+    )
+    port_default_parser.add_argument(
+        "--backup-dir",
+        default=str(DEFAULT_BACKUP_DIR),
+        help="Backup destination directory used before overwriting the detected bindings file",
+    )
+    port_default_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Preview the planned keyboard changes without writing the detected bindings file",
+    )
 
     args = parser.parse_args()
 
@@ -132,6 +160,8 @@ def main() -> int:
         return _run_restore(args, detected_file, bindings_dir)
     if args.command == "apply-default":
         return _run_apply_default(args, detected_file, bindings_dir)
+    if args.command == "port-default":
+        return _run_port_default(args, detected_file, bindings_dir)
     return _run_list(args.json, detected_file, bindings_dir, entries)
 
 
@@ -288,6 +318,165 @@ def _run_apply_default(args: argparse.Namespace, detected_file: Path, bindings_d
     return 0
 
 
+def _run_port_default(args: argparse.Namespace, detected_file: Path, bindings_dir: Path) -> int:
+    backup_dir = Path(args.backup_dir)
+    entries = list_default_preset_files(detected_file)
+    if not entries:
+        sys.stderr.write(
+            "Could not find any shipped default preset files relative to the detected bindings file.\n"
+        )
+        return 2
+
+    try:
+        source_base = _choose_entry(entries, args.source_base, label="source default preset")
+        target_base = _choose_entry(entries, args.target_base, label="target default preset")
+    except ValueError as exc:
+        sys.stderr.write(f"{exc}\n")
+        return 2
+
+    preview = port_keyboard_changes_to_preset(
+        detected_file,
+        source_preset=source_base.path,
+        target_preset=target_base.path,
+        target_file=detected_file,
+        dry_run=True,
+    )
+
+    if args.json:
+        payload = {
+            "detected_bindings_file": str(detected_file),
+            "detected_bindings_dir": str(bindings_dir),
+            "source_base": {
+                "path": str(source_base.path),
+                "preset_name": source_base.preset_name,
+            },
+            "target_base": {
+                "path": str(target_base.path),
+                "preset_name": target_base.preset_name,
+            },
+            "dry_run": bool(args.dry_run),
+            **preview,
+        }
+        if args.dry_run:
+            json.dump(payload, sys.stdout, indent=2)
+            sys.stdout.write("\n")
+            return 0
+    else:
+        _write_port_default_preview(source_base, target_base, preview)
+        if args.dry_run:
+            sys.stdout.write("Dry run only. No changes written.\n")
+            return 0
+
+    if not _confirm_overwrite(
+        f"Overwrite {detected_file.name} by porting keyboard changes from {source_base.preset_name} "
+        f"onto {target_base.preset_name}? A backup of your current bindings will be saved first. [y/N]: "
+    ):
+        if args.json:
+            payload["cancelled"] = True
+            json.dump(payload, sys.stdout, indent=2)
+            sys.stdout.write("\n")
+            return 0
+        sys.stdout.write("Cancelled.\n")
+        return 0
+
+    current_backup = copy_bindings_to_backup(detected_file, backup_dir=backup_dir)
+    result = port_keyboard_changes_to_preset(
+        detected_file,
+        source_preset=source_base.path,
+        target_preset=target_base.path,
+        target_file=detected_file,
+    )
+
+    if args.json:
+        payload["backup"] = str(current_backup)
+        payload["target"] = str(detected_file)
+        payload["dry_run"] = False
+        payload.update(result)
+        json.dump(payload, sys.stdout, indent=2)
+        sys.stdout.write("\n")
+        return 0
+
+    sys.stdout.write(f"Backed up current bindings to {current_backup}\n")
+    sys.stdout.write(
+        f"Ported {result['applied_count']} keyboard change(s) from {source_base.preset_name} "
+        f"onto {target_base.preset_name} in {detected_file}\n"
+    )
+    if result["skipped_count"]:
+        sys.stdout.write(f"Skipped {result['skipped_count']} change(s) that could not be mapped cleanly.\n")
+    return 0
+
+
+def _write_port_default_preview(
+    source_base: PresetFileEntry,
+    target_base: PresetFileEntry,
+    preview: dict[str, object],
+) -> None:
+    sys.stdout.write(
+        f"Preview: port keyboard changes from {source_base.preset_name} onto {target_base.preset_name}\n"
+    )
+    applied = preview["applied"]
+    if applied:
+        sys.stdout.write("Planned changes:\n")
+        for item in applied:
+            before = _format_slot_payload(item["from"])
+            after = _format_slot_payload(item["to"])
+            action_hint = format_binding_action_hint(item["action"])
+            sys.stdout.write(
+                f"- {action_hint} [{item['action']}]"
+                f" | {item['target_slot']} slot from {before} to {after}"
+                f" | based on {item['source_slot']} change\n"
+            )
+    else:
+        sys.stdout.write("No keyboard changes differ from the source preset.\n")
+    skipped_count = preview["skipped_count"]
+    if skipped_count:
+        sys.stdout.write(f"Skipped {skipped_count} change(s) that could not be mapped cleanly.\n")
+
+
+def _format_slot_payload(slot: dict[str, str | None]) -> str:
+    device = _format_device_name(slot["device"])
+    key = _format_key_name(slot["key"])
+    modifier = slot["modifier"]
+    if device == "Unbound":
+        return device
+    if modifier:
+        return f"{device} {key} + {_format_key_name(modifier)}"
+    return f"{device} {key}"
+
+
+def _format_device_name(device: str | None) -> str:
+    normalized = (device or "").strip()
+    if not normalized or normalized == "{NoDevice}":
+        return "Unbound"
+    if normalized == "Keyboard":
+        return "Keyboard"
+    if normalized == "GamePad":
+        return "Gamepad"
+    return normalized
+
+
+def _format_key_name(key: str | None) -> str:
+    normalized = (key or "").strip()
+    if not normalized:
+        return ""
+    if normalized.startswith("Key_"):
+        normalized = normalized[4:]
+    words = normalized.replace("_", " ")
+    words = words.replace("LeftBracket", "[").replace("RightBracket", "]")
+    words = words.replace("LeftArrow", "Left Arrow").replace("RightArrow", "Right Arrow")
+    words = words.replace("UpArrow", "Up Arrow").replace("DownArrow", "Down Arrow")
+    words = words.replace("PageUp", "Page Up").replace("PageDown", "Page Down")
+    words = words.replace("LeftShift", "Left Shift").replace("RightShift", "Right Shift")
+    words = words.replace("LeftControl", "Left Control").replace("RightControl", "Right Control")
+    words = words.replace("LeftAlt", "Left Alt").replace("RightAlt", "Right Alt")
+    words = words.replace("Backspace", "Backspace").replace("Space", "Space")
+    if len(words) == 1 and words.isalpha():
+        return words.upper()
+    if words.startswith("Pad_"):
+        return words[4:].replace("DPad", "D-Pad ")
+    return words
+
+
 def _choose_entry(entries: list[_SelectableEntry], selector: str | None, *, label: str) -> _SelectableEntry:
     if selector is not None:
         selected = _resolve_selector(entries, selector)
@@ -305,6 +494,8 @@ def _resolve_selector(entries: list[_SelectableEntry], selector: str) -> _Select
             return entries[index - 1]
     for entry in entries:
         if entry.name == candidate or str(entry.path) == candidate:
+            return entry
+        if isinstance(entry, PresetFileEntry) and entry.preset_name == candidate:
             return entry
     return None
 
