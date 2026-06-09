@@ -16,6 +16,32 @@ Current desired scope:
 
 This is explicitly not a multi-user/auth/product-surface design exercise yet.
 
+## Options Considered
+
+Rough menu of "easiest way to add a web UI to a Python repo," ordered by how little new tooling each one introduces:
+
+1. **FastAPI + WebSockets + a static HTML/JS page.** First-class WebSocket support, can serve static files, client can be a single `index.html` with vanilla JS or htmx plus a small WS snippet. No JS build step, no node toolchain. Most flexible long-term ceiling.
+2. **Flask + Flask-SocketIO.** Mature and well-documented. Slightly heavier (Socket.IO protocol, needs a JS client lib). Good built-in rooms/broadcast semantics.
+3. **Starlette directly.** What FastAPI is built on. Lighter if we do not need REST/OpenAPI ergonomics. Usually not worth the savings.
+4. **Pure-Python UI frameworks (NiceGUI, Reflex, Streamlit).** No hand-written JS. NiceGUI in particular is well-suited to control panels and has WebSocket-backed reactivity built in. Tradeoff: locked into the framework's component model, and mobile polish varies by framework.
+
+NiceGUI was picked from group 4 for the reasons in the next section. The other options remain valid fallbacks if NiceGUI stops fitting.
+
+## NiceGUI Mobile Strengths
+
+Recording these alongside the caveats so the picture is balanced:
+
+- Built on Quasar (Vue component lib), so buttons, inputs, cards, and dialogs are responsive and touch-sized by default.
+- WebSocket reactivity keeps the phone in sync with server state without us wiring anything.
+- Supports "Add to Home Screen" for a near-app feel, even without a full PWA install path.
+- Dark mode, rotation handling, and basic touch gestures on supported components work out of the box.
+
+Where it gets rough on mobile:
+
+- Layout control is coarser than hand-rolled CSS. Dense control-room-style panels on a small phone screen often need Tailwind/Quasar utility classes anyway, which erodes some of the "pure Python" appeal.
+- No native gestures beyond what Quasar exposes. No haptics. No real offline mode.
+- Long-lived sessions on phones are subject to the iOS/WebKit issues captured later in this doc.
+
 ## Current Recommendation
 
 If the next step is "get Control Room onto a phone quickly," `NiceGUI` is the leading candidate.
@@ -106,6 +132,21 @@ Practical takeaway:
 - Switching away from NiceGUI removes the repeated-reload bug and the post-reconnect unresponsiveness, but does not remove the universal iOS behaviors (background kill, screen-lock kill, fake-open socket).
 - Any stack we pick should assume the WebSocket will silently die on mobile and should be able to recover without user intervention beyond an occasional refresh.
 - HTTPS remains the safer default for any iPhone-in-the-loop scenario, even when not strictly required by the chosen stack.
+
+## Interaction Transport Shape (Non-NiceGUI Path)
+
+If we end up not using NiceGUI and build the surface ourselves, the suggested split is:
+
+- **Commands, cancel, replay: HTTP POST endpoints.** Addressable, easy to log, easy to script with `curl`, easy to retry. Each action is a discrete request with a clear status code.
+- **Live logs and panel/state updates: WebSocket, server to client.** One persistent channel for log lines and another (or a tagged stream) for state diffs. The client only consumes; it does not send commands over the socket.
+
+Why this split:
+
+- Keeps the command surface debuggable and replayable from outside the browser.
+- Keeps the WebSocket layer simple (one direction, no command routing) so reconnect logic only has to re-subscribe, not replay in-flight commands.
+- Plays well with the universal iOS WebSocket-death problem: a dropped socket only loses the live feed, never an in-flight command.
+
+If we stay on NiceGUI this section does not apply directly, because NiceGUI's realtime channel already covers both directions internally.
 
 ## Deferred Implementation Shape
 
