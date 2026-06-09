@@ -245,18 +245,52 @@ class DetectPhaseTests(unittest.TestCase):
     def test_docked_at_buy_empty_hold(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             d = Path(tmp)
-            _write_journal(d, [{"event": "Docked", "StationName": _BUY_STATION, "StarSystem": "Alpha"}])
+            _write_journal(
+                d,
+                [{"event": "Docked", "StationName": _BUY_STATION, "StarSystem": "Alpha", "CargoCapacity": 100}],
+            )
             _write_cargo(d, [])
             phase, _ = self._call(d)
         self.assertEqual(phase, Phase.BUY)
 
-    def test_docked_at_buy_with_target_cargo(self) -> None:
+    def test_docked_at_buy_with_partial_target_cargo_stays_in_buy(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             d = Path(tmp)
-            _write_journal(d, [{"event": "Docked", "StationName": _BUY_STATION, "StarSystem": "Alpha"}])
+            _write_journal(
+                d,
+                [{"event": "Docked", "StationName": _BUY_STATION, "StarSystem": "Alpha", "CargoCapacity": 100}],
+            )
+            _write_cargo(d, [{"Name": _COMMODITY_LOWER, "Count": 40}])
+            phase, _ = self._call(d)
+        self.assertEqual(phase, Phase.BUY)
+
+    def test_docked_at_buy_with_full_target_cargo(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            d = Path(tmp)
+            _write_journal(
+                d,
+                [{"event": "Docked", "StationName": _BUY_STATION, "StarSystem": "Alpha", "CargoCapacity": 100}],
+            )
             _write_cargo(d, [{"Name": _COMMODITY_LOWER, "Count": 100}])
             phase, _ = self._call(d)
         self.assertEqual(phase, Phase.UNDOCK_BUY)
+
+    def test_docked_at_buy_with_full_mixed_cargo_stays_in_buy(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            d = Path(tmp)
+            _write_journal(
+                d,
+                [{"event": "Docked", "StationName": _BUY_STATION, "StarSystem": "Alpha", "CargoCapacity": 100}],
+            )
+            _write_cargo(
+                d,
+                [
+                    {"Name": _COMMODITY_LOWER, "Count": 80},
+                    {"Name": "gold", "Count": 20},
+                ],
+            )
+            phase, _ = self._call(d)
+        self.assertEqual(phase, Phase.BUY)
 
     def test_not_docked_with_target_cargo(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -277,10 +311,18 @@ class DetectPhaseTests(unittest.TestCase):
     def test_normal_space_in_buy_system_with_target_cargo_departs_to_sell(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             d = Path(tmp)
-            _write_journal(d, [{"event": "Undocked", "StarSystem": "Achenar"}])
+            _write_journal(d, [{"event": "Undocked", "StarSystem": "Achenar", "CargoCapacity": 100}])
             _write_cargo(d, [{"Name": _COMMODITY_LOWER, "Count": 100}])
             phase, _ = self._call(d, sell_system="Sol", buy_system="Achenar")
         self.assertEqual(phase, Phase.DEPART_BUY_SYSTEM)
+
+    def test_normal_space_in_buy_system_with_partial_target_cargo_returns_to_buy_station(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            d = Path(tmp)
+            _write_journal(d, [{"event": "Undocked", "StarSystem": "Achenar", "CargoCapacity": 100}])
+            _write_cargo(d, [{"Name": _COMMODITY_LOWER, "Count": 40}])
+            phase, _ = self._call(d, sell_system="Sol", buy_system="Achenar")
+        self.assertEqual(phase, Phase.TRANSIT_TO_BUY)
 
     def test_not_docked_empty_hold(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

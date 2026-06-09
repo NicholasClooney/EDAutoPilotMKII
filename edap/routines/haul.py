@@ -35,6 +35,55 @@ def _read_cargo_json(journal_dir: Path) -> list[dict]:
         return []
 
 
+def _read_last_cargo_capacity(journal_dir: Path) -> int | None:
+    journals = sorted(journal_dir.glob("Journal.*.log"), key=lambda p: p.stat().st_mtime)
+    for journal_file in reversed(journals):
+        try:
+            with journal_file.open(encoding="utf-8") as fh:
+                lines = fh.readlines()
+        except OSError:
+            continue
+        for line in reversed(lines):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                event = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            cargo_capacity = event.get("CargoCapacity")
+            if isinstance(cargo_capacity, bool) or not isinstance(cargo_capacity, (int, float)):
+                continue
+            if cargo_capacity > 0:
+                return int(cargo_capacity)
+    return None
+
+
+def _target_cargo_status(journal_dir: Path, commodity: str) -> tuple[bool, bool | None]:
+    inventory = _read_cargo_json(journal_dir)
+    commodity_lower = commodity.lower()
+    target_count = 0
+    used_capacity = 0
+    for item in inventory:
+        count = item.get("Count", 0)
+        if isinstance(count, bool) or not isinstance(count, (int, float)):
+            continue
+        units = max(0, int(count))
+        used_capacity += units
+        if (
+            str(item.get("Name", "")).lower() == commodity_lower
+            or str(item.get("Name_Localised", "")).lower() == commodity_lower
+        ):
+            target_count += units
+
+    cargo_capacity = _read_last_cargo_capacity(journal_dir)
+    is_full_target_cargo = None
+    if cargo_capacity is not None:
+        is_full_target_cargo = cargo_capacity > 0 and target_count >= cargo_capacity and used_capacity == target_count
+
+    return target_count > 0, is_full_target_cargo
+
+
 def _sellable_cargo(inventory: list[dict]) -> list[dict]:
     return [
         item for item in inventory
@@ -131,21 +180,12 @@ def _detect_phase(
             current_system = ""
 
     # Cargo state
-    inventory = _read_cargo_json(journal_dir)
-    commodity_lower = commodity.lower()
-    has_target_cargo = any(
-        item.get("Count", 0) > 0
-        and (
-            str(item.get("Name", "")).lower() == commodity_lower
-            or str(item.get("Name_Localised", "")).lower() == commodity_lower
-        )
-        for item in inventory
-    )
+    has_target_cargo, has_full_target_cargo = _target_cargo_status(journal_dir, commodity)
 
     if progress_fn is not None:
         progress_fn(
             f"Phase detect: status={ship_status}, station={current_station!r}, "
-            f"system={current_system!r}, has_target={has_target_cargo}"
+            f"system={current_system!r}, has_target={has_target_cargo}, full_target={has_full_target_cargo}"
         )
 
     if ship_status == "docked":
@@ -158,14 +198,14 @@ def _detect_phase(
             return phase, buy_station
 
         if buy_lower and station_lower == buy_lower:
-            phase = Phase.BUY if not has_target_cargo else Phase.UNDOCK_BUY
+            phase = Phase.UNDOCK_BUY if has_full_target_cargo else Phase.BUY
             return phase, buy_station
 
         # Unknown station
         if not buy_station and sell_lower and station_lower != sell_lower:
             if confirm_fn(f"Assume current station {current_station!r} is the buy station?"):
                 updated_buy = current_station
-                phase = Phase.BUY if not has_target_cargo else Phase.UNDOCK_BUY
+                phase = Phase.UNDOCK_BUY if has_full_target_cargo else Phase.BUY
                 return phase, updated_buy
             raise RuntimeError(
                 f"Cannot determine buy station: docked at {current_station!r} and user declined to confirm"
@@ -188,9 +228,9 @@ def _detect_phase(
         return Phase.TRANSIT_TO_BUY, buy_station
 
     if current_system_lower and buy_system_lower and current_system_lower == buy_system_lower:
-        if has_target_cargo and ship_status == "normal_space":
+        if has_full_target_cargo and ship_status == "normal_space":
             return Phase.DEPART_BUY_SYSTEM, buy_station
-        return (Phase.UNDOCK_BUY if has_target_cargo else Phase.TRANSIT_TO_BUY), buy_station
+        return (Phase.UNDOCK_BUY if has_full_target_cargo else Phase.TRANSIT_TO_BUY), buy_station
 
     # Not docked outside the configured buy/sell systems.
     if has_target_cargo:

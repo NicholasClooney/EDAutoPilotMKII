@@ -85,3 +85,4 @@ Last updated: 2026-06-09
 - Put verbose validation logs, session chronology, long capability matrices, refactor TODOs, and speculative backlog notes in [status-archive.md](status-archive.md) or a more specific supporting doc.
 - Do not read [status-archive.md](status-archive.md) during normal work unless the user explicitly asks for archive/history detail or newer compact docs are insufficient to unblock the task.
 - If a section starts reading like a changelog or investigation log, move that detail out of `STATUS.md` and leave a one-line summary plus a link.
+- The legacy `edap/routines/haul.py` resume detector no longer treats “any target cargo” as “buy leg complete”: docked or in-system resumes at the buy side now only skip back to undock/depart when the hold is actually full of the target commodity.
