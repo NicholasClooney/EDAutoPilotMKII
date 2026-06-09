@@ -4,6 +4,7 @@ _This is the rolling short-form log for recent sessions. Keep entries concise an
 
 ## 2026-06-09
 
+- Shared journal snapshots now retain commander identity from `LoadGame`/`Commander`, and Control Room bootstrap seeds that field on startup so the operator name appears even when the UI attaches mid-session; verified with `uv run python3 -m unittest discover -s tests` (`321` tests, `0.146s`).
 - Control Room now appends every consumed journal event to repo-local `artifacts/control-room.log`, so live sessions have a durable event trace even when `watch_journal.py` is not running; verified with `uv run python3 -m unittest discover -s tests` (`315` tests, `0.136s`).
 - Documented Elite preset locations and controller-token format under CrossOver in `docs/research/0006-elite-bindings-preset-locations.md`: built-in presets come from the installed `Products/elite-dangerous-odyssey-64/ControlSchemes` folder, user-editable profiles still live under `AppData/Local/.../Options/Bindings`, and controller bindings are stored as symbolic `Device`/`Key` pairs with USB identity data in `DeviceMappings.xml`.
 - `bindings_files.py` now supports `restore` from repo-local backups and `apply-default` from shipped `ControlSchemes` presets; both flows save a fresh backup before overwriting the active file, `restore` supports numbered or interactive selection, and preset application preserves the active file's `PresetName`/version metadata. Verified with `uv run python3 -m unittest discover -s tests` (`310` tests, `0.145s`).

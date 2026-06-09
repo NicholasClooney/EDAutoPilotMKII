@@ -34,7 +34,7 @@ class StateTests(unittest.TestCase):
             _write_lines(
                 log_path,
                 [
-                    '{"event":"LoadGame","Ship":"type6","FuelLevel":8.0,"FuelCapacity":{"Main":16.0}}',
+                    '{"event":"LoadGame","Commander":"VRYAE","Ship":"type6","FuelLevel":8.0,"FuelCapacity":{"Main":16.0}}',
                     '{"event":"Location","Docked":false,"StarSystem":"Sol","FuelLevel":8.0,"FuelCapacity":16.0}',
                     '{"event":"FSDTarget","Name":"Achenar"}',
                     '{"event":"StartJump","JumpType":"Hyperspace","StarClass":"K"}',
@@ -45,6 +45,7 @@ class StateTests(unittest.TestCase):
 
             state = read_ship_state(log_path)
 
+            self.assertEqual(state.commander, "VRYAE")
             self.assertEqual(state.ship_type, "type6")
             self.assertEqual(state.location, "Sol")
             self.assertEqual(state.target, "Achenar")
@@ -112,6 +113,22 @@ class StateTests(unittest.TestCase):
             state = read_ship_state(log_path)
 
             self.assertEqual(state.status, "in_space")
+
+    def test_read_ship_state_prefers_commander_event_name(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            log_path = Path(temp_dir) / "Journal.log"
+            _write_lines(
+                log_path,
+                [
+                    '{"event":"LoadGame","Commander":"Initial","Ship":"type6"}',
+                    '{"event":"Commander","Name":"Updated"}',
+                ],
+            )
+            os.utime(log_path, None)
+
+            state = read_ship_state(log_path)
+
+            self.assertEqual(state.commander, "Updated")
 
     def test_journal_watcher_starts_at_end_by_default_and_reads_appended_events(self) -> None:
         with TemporaryDirectory() as temp_dir:

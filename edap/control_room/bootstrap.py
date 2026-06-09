@@ -43,6 +43,7 @@ def bootstrap_ship_state(app: BootstrapHost) -> None:
     if log is not None:
         try:
             state = read_ship_state(log)
+            app._ship.commander = state.commander
             app._ship.system = state.location
             app._ship.status = state.status
             app._ship.ship_type = state.ship_type

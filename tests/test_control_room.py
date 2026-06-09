@@ -339,6 +339,12 @@ class ControlRoomCommandTests(unittest.TestCase):
         journal_dir = Path(self.tmpdir.name)
         (journal_dir / "Journal.240101000000.01.log").write_text(
             json.dumps({
+                "event": "LoadGame",
+                "Commander": "VRYAE",
+                "Ship": "type6",
+                "FuelLevel": 16.0,
+                "FuelCapacity": 32.0,
+            }) + "\n" + json.dumps({
                 "event": "Location",
                 "Docked": True,
                 "StarSystem": "HIP 58412",
@@ -374,6 +380,7 @@ class ControlRoomCommandTests(unittest.TestCase):
 
         self.app._bootstrap_ship_state()
 
+        self.assertEqual(self.app._ship.commander, "VRYAE")
         self.assertEqual(self.app._ship.system, "HIP 58412")
         self.assertEqual(self.app._ship.credits, 123456789)
         self.assertEqual(self.app._ship.cargo_count, 24)
@@ -381,6 +388,17 @@ class ControlRoomCommandTests(unittest.TestCase):
         self.assertEqual(self.app._ship.destination_body, "Dawes Hub")
         self.assertEqual(self.app._ship.destination_name, "Dawes Hub")
         self.assertEqual(len(self.app._ship.cargo_inventory), 2)
+
+    def test_bootstrap_ship_state_reads_commander_from_commander_event(self) -> None:
+        journal_dir = Path(self.tmpdir.name)
+        (journal_dir / "Journal.240101000000.01.log").write_text(
+            json.dumps({"event": "Commander", "Name": "VRYAE"}) + "\n",
+            encoding="utf-8",
+        )
+
+        self.app._bootstrap_ship_state()
+
+        self.assertEqual(self.app._ship.commander, "VRYAE")
 
     def test_sync_status_snapshot_refreshes_destination_without_journal_event(self) -> None:
         journal_dir = Path(self.tmpdir.name)

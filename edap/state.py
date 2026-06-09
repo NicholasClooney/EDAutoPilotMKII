@@ -11,6 +11,7 @@ from typing import Callable, Iterator
 @dataclass(frozen=True)
 class ShipState:
     time_since_log_update_s: int
+    commander: str | None
     status: str | None
     ship_type: str | None
     location: str | None
@@ -113,6 +114,7 @@ def read_ship_state(log_path: Path) -> ShipState:
     last_modified = datetime.fromtimestamp(log_path.stat().st_mtime)
     ship = {
         "time_since_log_update_s": int((datetime.now() - last_modified).total_seconds()),
+        "commander": None,
         "status": None,
         "ship_type": None,
         "location": None,
@@ -162,7 +164,13 @@ def read_ship_state(log_path: Path) -> ShipState:
             ):
                 ship["status"] = "in_station"
 
-            if event in {"LoadGame", "Loadout"}:
+            if event == "Commander":
+                ship["commander"] = log.get("Name")
+
+            if event == "LoadGame":
+                ship["commander"] = log.get("Commander", ship["commander"])
+                ship["ship_type"] = log.get("Ship")
+            elif event == "Loadout":
                 ship["ship_type"] = log.get("Ship")
 
             if "FuelLevel" in log and ship["ship_type"] != "TestBuggy":
