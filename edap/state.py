@@ -15,6 +15,7 @@ class ShipState:
     status: str | None
     ship_type: str | None
     location: str | None
+    station: str | None
     star_class: str | None
     target: str | None
     fuel_capacity: float | None
@@ -118,6 +119,7 @@ def read_ship_state(log_path: Path) -> ShipState:
         "status": None,
         "ship_type": None,
         "location": None,
+        "station": None,
         "star_class": None,
         "target": None,
         "fuel_capacity": None,
@@ -130,6 +132,7 @@ def read_ship_state(log_path: Path) -> ShipState:
         for line in handle:
             log = loads(line)
             event = log.get("event")
+            status_before_event = ship["status"]
 
             if event == "StartJump":
                 ship["status"] = f"starting_{log['JumpType']}".lower()
@@ -196,6 +199,18 @@ def read_ship_state(log_path: Path) -> ShipState:
 
             if event in {"Location", "FSDJump"} and "StarSystem" in log:
                 ship["location"] = log["StarSystem"]
+            if event == "Docked" or (
+                event in {"Location", "CarrierJump"} and log.get("Docked") is True
+            ):
+                ship["station"] = log.get("StationName", ship["station"])
+            elif event == "SupercruiseExit" or (
+                event == "Music"
+                and log.get("MusicTrack") == "NoTrack"
+                and status_before_event == "in_undocking"
+            ) or (
+                event in {"Location", "CarrierJump"} and log.get("Docked") is False
+            ):
+                ship["station"] = None
 
             if event == "FSDTarget":
                 if log.get("Name") == ship["location"]:

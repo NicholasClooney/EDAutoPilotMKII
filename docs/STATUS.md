@@ -23,6 +23,8 @@ Last updated: 2026-06-09
 - Journal/runtime: journal tailing, bindings lookup, runtime construction, and shared platform seams are working.
 - Control Room: live Textual UI with ship status, market panel, haul stats, replay/history, persisted state, routine dispatch, queued cross-platform TTS announcements, and a repo-local `artifacts/control-room.log` journal-event mirror for sessions where the standalone watcher is not running.
 - Control Room bootstrap now restores commander name from the latest journal snapshot, so opening the UI mid-session no longer depends on catching a fresh live `LoadGame` or `Commander` event.
+- Control Room and two-way haul startup now prefer the full journal-derived current station/system over stale `Market.json` metadata, and the shared ship snapshot now retains station name alongside system/status during bootstrap/resume.
+- The location-regression root cause and prevention notes are captured in `docs/devlog/0002-control-room-location-regression.md`; the key lesson is that current station/system must come from one canonical journal-derived snapshot rather than ad hoc `Market.json` fallback.
 - Control Room `Ctrl-C`/`Ctrl-D` handling is now haul-aware: the first interrupt during `haul` queues a stop at the next station-1 cycle boundary after the return sale, announces that deferred stop, and a second interrupt still cancels immediately.
 - Routines: `jump`, `dock`, `undock`, market buy/sell, galaxy-map destination setting, and the two-way haul loop live under `edap/routines/`.
 - Hauling: `edap.routines.haul_loop` now aliases the two-way implementation directly; the older one-way haul codepath is gone.

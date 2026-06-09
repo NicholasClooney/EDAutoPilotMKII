@@ -1034,6 +1034,48 @@ class TwoWayHaulLoopTests(unittest.TestCase):
         self.assertEqual(result.dispatch.status, "ok")
         self.assertEqual(market_calls[0], ("buy", _CARGO_2))
 
+    def test_detect_start_phase_prefers_journal_system_over_stale_market_system(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            journal_dir = Path(tmp)
+            progress: list[str] = []
+            _write_journal(
+                journal_dir,
+                {"event": "FSDJump", "StarSystem": _SYSTEM_1},
+                {"event": "Docked", "StationName": _STATION_1},
+            )
+            (journal_dir / "Market.json").write_text(
+                json.dumps({
+                    "StationName": _STATION_1,
+                    "StarSystem": _SYSTEM_2,
+                    "Items": [],
+                }),
+                encoding="utf-8",
+            )
+            _write_cargo(journal_dir, [{"Name": "aluminium", "Count": 64, "Stolen": 0}])
+            phase = _detect_start_phase(
+                journal_dir,
+                station_1=StationLeg(
+                    index=1,
+                    station=_STATION_1,
+                    system=_SYSTEM_1,
+                    buy_commodity=_CARGO_1,
+                    sell_commodity=_CARGO_2,
+                ),
+                station_2=StationLeg(
+                    index=2,
+                    station=_STATION_2,
+                    system=_SYSTEM_2,
+                    buy_commodity=_CARGO_2,
+                    sell_commodity=_CARGO_1,
+                ),
+                progress_fn=progress.append,
+            )
+
+        self.assertEqual(phase, Phase.AT_STATION_1_BUY)
+        self.assertTrue(progress)
+        self.assertIn(f"system='{_SYSTEM_1}'", progress[-1])
+        self.assertNotIn(f"system='{_SYSTEM_2}'", progress[-1])
+
     def test_undock_aborts_haul_on_no_track_timeout_and_logs_replay_hint(self) -> None:
         controls = FakeShipControls()
         watcher = FakeWatcher([

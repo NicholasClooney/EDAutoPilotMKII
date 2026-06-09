@@ -45,6 +45,7 @@ def bootstrap_ship_state(app: BootstrapHost) -> None:
             state = read_ship_state(log)
             app._ship.commander = state.commander
             app._ship.system = state.location
+            app._ship.station = state.station
             app._ship.status = state.status
             app._ship.ship_type = state.ship_type
             app._ship.fuel_level = state.fuel_level
@@ -70,9 +71,17 @@ def load_market_json(app: BootstrapHost) -> None:
     except Exception:
         return
 
+    station = data.get("StationName", "?")
+    system = data.get("StarSystem", "?")
+    if app._ship.status == "in_station":
+        if app._ship.station:
+            station = app._ship.station
+        if app._ship.system:
+            system = app._ship.system
+
     app._market = MarketData(
-        station=data.get("StationName", "?"),
-        system=data.get("StarSystem", "?"),
+        station=station,
+        system=system,
         timestamp=data.get("timestamp", ""),
         items=data.get("Items", []),
         locked=app._market.locked,

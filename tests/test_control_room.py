@@ -507,7 +507,13 @@ class ControlRoomCommandTests(unittest.TestCase):
     def test_load_market_json_seeds_ship_station_when_in_station(self) -> None:
         journal_dir = Path(self.tmpdir.name)
         (journal_dir / "Journal.240101000000.01.log").write_text(
-            json.dumps({"event": "Docked"}) + "\n",
+            "\n".join(
+                [
+                    json.dumps({"event": "FSDJump", "StarSystem": "Col 285 Sector HD-F b13-1"}),
+                    json.dumps({"event": "Docked", "StationName": "Pawelczyk Dock"}),
+                ]
+            )
+            + "\n",
             encoding="utf-8",
         )
         (journal_dir / "Market.json").write_text(
@@ -522,13 +528,15 @@ class ControlRoomCommandTests(unittest.TestCase):
 
         self.app._bootstrap_ship_state()
         self.assertEqual(self.app._ship.status, "in_station")
-        self.assertFalse(self.app._ship.station)
-        self.assertFalse(self.app._ship.system)
+        self.assertEqual(self.app._ship.station, "Pawelczyk Dock")
+        self.assertEqual(self.app._ship.system, "Col 285 Sector HD-F b13-1")
 
         self.app._load_market_json()
 
         self.assertEqual(self.app._ship.station, "Pawelczyk Dock")
-        self.assertEqual(self.app._ship.system, "HIP 58412")
+        self.assertEqual(self.app._ship.system, "Col 285 Sector HD-F b13-1")
+        self.assertEqual(self.app._market.station, "Pawelczyk Dock")
+        self.assertEqual(self.app._market.system, "Col 285 Sector HD-F b13-1")
 
     def test_load_market_json_does_not_seed_when_not_in_station(self) -> None:
         journal_dir = Path(self.tmpdir.name)

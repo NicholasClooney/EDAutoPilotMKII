@@ -18,6 +18,7 @@ from edap.routines.docking import _undock_until_undocked, _wait_for_clear_of_sta
 from edap.routines.escape import escape_mass_lock
 from edap.routines.galaxy_map import set_gal_map_destination
 from edap.routines.market import market_buy, market_sell
+from edap.state import get_latest_journal_log, read_ship_state
 from edap.tts import AnnouncementId
 
 
@@ -299,41 +300,25 @@ def _detect_start_phase(
     station_2: StationLeg,
     progress_fn: Callable[[str], None] | None = None,
 ) -> Phase:
-    events = _read_latest_journal_events(journal_dir)
-    position_event_types = {"Docked", "Undocked", "SupercruiseEntry", "SupercruiseExit", "Location", "FSDJump"}
-    latest_position: dict | None = None
-    for event in reversed(events):
-        if event.get("event") in position_event_types:
-            latest_position = event
-            break
-
-    if latest_position is None:
-        ship_status = "unknown"
-        current_station = ""
-        current_system = ""
-    else:
-        evt_name = str(latest_position.get("event", ""))
-        if evt_name == "Docked":
-            ship_status = "docked"
-            current_station = str(latest_position.get("StationName", ""))
-            current_system = str(latest_position.get("StarSystem", ""))
-        elif evt_name in {"SupercruiseEntry", "FSDJump"}:
-            ship_status = "supercruise"
-            current_station = ""
-            current_system = str(latest_position.get("StarSystem", ""))
-        elif evt_name in {"SupercruiseExit", "Undocked"}:
-            ship_status = "normal_space"
-            current_station = ""
-            current_system = str(latest_position.get("StarSystem", ""))
-        elif evt_name == "Location":
-            docked = bool(latest_position.get("Docked", False))
-            ship_status = "docked" if docked else "normal_space"
-            current_station = str(latest_position.get("StationName", "")) if docked else ""
-            current_system = str(latest_position.get("StarSystem", ""))
-        else:
-            ship_status = "unknown"
-            current_station = ""
-            current_system = ""
+    ship_status = "unknown"
+    current_station = ""
+    current_system = ""
+    log_path = get_latest_journal_log(journal_dir)
+    if log_path is not None:
+        try:
+            state = read_ship_state(log_path)
+        except Exception:
+            state = None
+        if state is not None:
+            current_station = str(state.station or "")
+            current_system = str(state.location or "")
+            status = str(state.status or "")
+            if status == "in_station":
+                ship_status = "docked"
+            elif status in {"in_space", "in_undocking", "starting_docking", "in_docking"}:
+                ship_status = "normal_space"
+            elif status in {"in_supercruise", "starting_hyperspace", "starting_supercruise"}:
+                ship_status = "supercruise"
 
     inventory = _read_cargo_json(journal_dir)
     has_station_1_cargo = _inventory_has_commodity(inventory, station_1.buy_commodity)

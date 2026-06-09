@@ -48,6 +48,7 @@ class StateTests(unittest.TestCase):
             self.assertEqual(state.commander, "VRYAE")
             self.assertEqual(state.ship_type, "type6")
             self.assertEqual(state.location, "Sol")
+            self.assertIsNone(state.station)
             self.assertEqual(state.target, "Achenar")
             self.assertEqual(state.status, "starting_hyperspace")
             self.assertEqual(state.star_class, "K")
@@ -76,6 +77,7 @@ class StateTests(unittest.TestCase):
 
             self.assertEqual(state.status, "in_station")
             self.assertEqual(state.location, "Sol")
+            self.assertEqual(state.station, "Abraham Lincoln")
 
     def test_read_ship_state_keeps_auto_undock_in_undocking_until_no_track(self) -> None:
         with TemporaryDirectory() as temp_dir:
@@ -113,6 +115,26 @@ class StateTests(unittest.TestCase):
             state = read_ship_state(log_path)
 
             self.assertEqual(state.status, "in_space")
+            self.assertIsNone(state.station)
+
+    def test_read_ship_state_keeps_last_known_system_on_docked_event(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            log_path = Path(temp_dir) / "Journal.log"
+            _write_lines(
+                log_path,
+                [
+                    '{"event":"LoadGame","Ship":"type6"}',
+                    '{"event":"FSDJump","StarSystem":"HIP 58412"}',
+                    '{"event":"Docked","StationName":"Pawelczyk Dock"}',
+                ],
+            )
+            os.utime(log_path, None)
+
+            state = read_ship_state(log_path)
+
+            self.assertEqual(state.status, "in_station")
+            self.assertEqual(state.location, "HIP 58412")
+            self.assertEqual(state.station, "Pawelczyk Dock")
 
     def test_read_ship_state_prefers_commander_event_name(self) -> None:
         with TemporaryDirectory() as temp_dir:
