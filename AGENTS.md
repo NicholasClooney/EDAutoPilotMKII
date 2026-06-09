@@ -36,7 +36,7 @@ Use [docs/session-log.md](docs/session-log.md) for concise rolling session notes
 - Run all tests: `uv run python3 -m unittest discover -s tests`
 - Do not use the bare system interpreter for test runs; the repo's `uv` environment is the required test entrypoint.
 - After implementing any feature or code change, run the full suite with `uv run python3 -m unittest discover -s tests` before wrapping up.
-- After implementing any feature or code change, also run the timing check and keep the full-suite runtime at or under `0.2` seconds. If the suite is slower than `0.2` seconds, run `UV_CACHE_DIR=/private/tmp/uv-cache uv run python3 tools/report_test_timing.py --top 10 --sort slowest` to identify what is dragging runtime down.
+- After implementing any feature or code change, use the runtime reported by the preceding `uv run python3 -m unittest discover -s tests` command as the timing check and keep the full-suite runtime at or under `0.2` seconds. If that command reports a runtime slower than `0.2` seconds, run `UV_CACHE_DIR=/private/tmp/uv-cache uv run python3 tools/report_test_timing.py --top 10 --sort slowest` to identify what is dragging runtime down.
 
 ## Working Rules
 
