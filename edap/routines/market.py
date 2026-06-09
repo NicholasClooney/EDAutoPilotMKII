@@ -31,8 +31,12 @@ def _market_buy_list(items: list[dict]) -> list[tuple[str, str]]:
 def _is_sell_market_item(item: dict) -> bool:
     demand_bracket = int(item.get("DemandBracket", 0) or 0)
     sell_price = int(item.get("SellPrice", 0) or 0)
-    # Some stations still allow sales even when demand has fallen to zero.
-    # Keep excluding placeholder rows that have no demand signal and no price.
+    # Elite can let the player sell cargo the station is not actively buying.
+    # In Market.json that often shows up as DemandBracket == 0 with a non-zero
+    # SellPrice. Treat those rows as intentionally sellable so EDAP can still
+    # target and offload the player's existing cargo there.
+    #
+    # Keep excluding placeholder rows that have neither demand nor a sell price.
     return demand_bracket > 0 or sell_price > 0
 
 
@@ -55,6 +59,11 @@ def _market_sell_list_for_target(items: list[dict], target_item: dict | None) ->
     )
     if any(name.lower() == target_row[1].lower() for _, name in rows):
         return rows
+    # The visible SELL list is demand-based, but the game can still accept a
+    # sale for cargo already in the player's hold even when that commodity does
+    # not appear in the station's normal buy list. When Market.json exposes a
+    # price for the target, inject just that target row so cursor indexing still
+    # lines up with the game behavior we intentionally support.
     rows = rows + [target_row]
     return sorted(rows, key=lambda r: (r[0].lower(), r[1].lower()))
 
