@@ -1,6 +1,6 @@
 # EDAutopilot MK II
 
-Multiplatform Elite Dangerous automation tooling focused on a shared runtime across macOS, Windows, and Linux. The active runtime is currently validated on macOS with Elite running through CrossOver, and community testing is still needed to validate the Windows and Linux paths.
+Multiplatform Elite Dangerous automation tooling focused on a shared runtime across macOS, Windows, and Linux. The active runtime is live-validated on macOS with Elite running through CrossOver by myself, @NicholasClooney, and the Windows path is now also live-validated by community member CMDR VRYAE. Linux remains unvalidated.
 
 The current operator surface is [`control_room.py`](control_room.py). The project is not a full autopilot yet; it is a live runtime and routine stack built around journal parsing, bindings lookup, synthetic input, and early workflow automation.
 
@@ -13,6 +13,7 @@ See [docs/STATUS.md](docs/STATUS.md) for the maintained status, validation notes
 What works today:
 
 - shared journal parsing, bindings lookup, and platform input/runtime plumbing across supported targets
+- live-validated operator paths on macOS via CrossOver and on Windows via community testing from CMDR VRYAE
 - journal-driven `haul`, `jump`, `dock`, `undock`, `buy`, `sell`, and `dest` flows
 - a live Control Room TUI with ship status, activity log, market panel, replay history, and saved default haul setup
 
@@ -26,6 +27,12 @@ What is not done:
 - `uv run python3 run_routine.py --routine haul_loop`
 - `uv run python3 diagnostics.py`
 - `uv run python3 ship_controls.py --action SetSpeedZero --delay-seconds 3`
+
+## Platform Validation
+
+- macOS: live-validated with Elite running through CrossOver by myself, @NicholasClooney
+- Windows: live-validated by community member CMDR VRYAE
+- Linux: runtime paths exist, but no live validation yet
 
 ## Routine Overview
 

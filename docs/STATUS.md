@@ -7,6 +7,7 @@ Last updated: 2026-06-09
 ## Current Snapshot
 
 - Plan 0001 (macOS MVP portability) is complete. The shared runtime, config system, journal parsing, bindings lookup, and synthetic input path are in place and live-validated on macOS + CrossOver.
+- Windows operator/runtime compatibility now also has live community validation from CMDR VRYAE, shifting the platform story from macOS-only live validation to macOS primary plus early real-world Windows confirmation.
 - The project is in follow-up work, not a full autopilot rewrite. Active work is focused on journal-driven routines, two-way hauling, CV/capture validation, and operator diagnostics.
 - `control_room.py` is the primary operator surface. `run_routine.py`, `ship_controls.py`, `diagnostics.py`, `speak.py`, and the journal/bindings helpers are the main manual-validation tools.
 
@@ -36,12 +37,13 @@ Last updated: 2026-06-09
 - Market buy/sell now also hard-reset trade-dialog focus with `UI_Left x3` plus `UI_Up x3` immediately after opening a commodity, so quantity and confirm navigation no longer depend on the initial cursor landing on the amount controls; sell now re-holds `UI_Right` afterward based on the intended tonnage so `sell ... max` still restores the full quantity after that reset.
 - `ActionDispatcher` is now the single source of truth for repeat pacing: repeated actions and raw keys are emitted as separate delayed taps there, `ShipControls` inherits that behavior without its own repeat loop, and `submit_text` now follows the same pacing semantics.
 - Release prep for the next stable cut now requires `pyproject.toml` and `uv.lock` version metadata to stay in sync: bump `[project].version`, run `uv sync`, and commit the resulting lockfile change as part of the release changeset.
+- Release prep for `v1.5.0` is in progress: docs now explicitly call out early live Windows validation from CMDR VRYAE alongside macOS + CrossOver validation by @NicholasClooney.
 - Market `buy ... max` no longer holds `UI_Right` for a fixed 10 seconds: it now scales hold time from the smaller of remaining cargo space and current station supply with `controls.market_buy_hold_seconds_per_ton` (default `0.01s` per ton), and only falls back to the old cap when neither limit can be derived.
 - TTS/config: announcement IDs are typed in code, while default phrase text now lives in `defaults/tts.toml` and merges with user `config.toml` overrides under `[tts]`.
 - `speak.py` provides a minimal TTS smoke-test path outside Control Room: `uv run python3 speak.py "hello"` detects the current host platform with the repo runtime rules and speaks directly through the selected backend.
 - `tools/scratch/scratch_market.py` now supports machine-friendly JSON output plus `--side all|buy|sell` filtering for quick market inspection; its JSON output now mirrors the default in-game ordering too (alphabetical categories, alphabetical items within each category), while intentionally keeping its conservative station-view logic (`buy` = `Stock > 0`, `sell` = `DemandBracket > 0`) separate from EDAP's more permissive targeted-sell routine behavior.
 - Windows input injection now builds the full Win32 `INPUT` union shape instead of a keyboard-only subset and includes native `GetLastError()` codes in `SendInput` failures, after admin-to-admin Notepad repros suggested the old structure size could fail on 64-bit Windows before UIPI ever mattered.
-- Platform scope: macOS + CrossOver is the only live-validated operator path. Windows and Linux input/runtime paths exist with unit-test and CI coverage, but not live validation.
+- Platform scope: macOS + CrossOver remains the primary operator path and is live-validated. Windows now also has early live community validation from CMDR VRYAE. Linux input/runtime paths still only have unit-test and CI coverage, not live validation.
 - CI: cross-platform unittest workflow exists in GitHub Actions, a timing guard now enforces a 3-second ceiling on full unittest discovery over `tests/`, and `tools/report_test_timing.py` can rank the slowest individual unittest cases locally.
 - Cross-platform test fixtures now avoid Windows-specific TOML parse traps by using TOML literal strings for interpolated filesystem paths, and CLI path assertions compare against the runtime-rendered path instead of hardcoded POSIX separators.
 
@@ -50,7 +52,7 @@ Last updated: 2026-06-09
 - The legacy autopilot loop is still not ported. This repo is currently automation/runtime tooling plus a growing set of journal-driven routines, not a complete autopilot.
 - Two-way hauling is the active operator path, but it still needs more live validation around startup/resume/station-role detection after the latest fixes.
 - TTS is implemented for macOS (`say`) plus Linux/Windows fallbacks, but only macOS is expected to be live-validated soon; wording/noise level still needs operator feedback after in-game use.
-- Windows still lacks live validation; after the `INPUT` layout fix, any remaining `SendInput` failures need a fresh Windows rerun to separate residual UIPI/focus issues from backend bugs.
+- Windows now has early live community validation from CMDR VRYAE, but it still needs broader validation coverage after the `INPUT` layout fix to separate any residual UIPI/focus issues from backend bugs on other machines and setups.
 - CV is still at validation/scaffolding stage. Template matching has been re-baked against CrossOver captures, but there is no real continuous alignment loop yet.
 - Because the control-room startup warning now suppresses currently unused maneuver bindings, any future CV/alignment or flight-control work that starts depending on roll/pitch/yaw must re-enable startup warnings for those actions in the same change.
 - Timing enforcement now covers the full unittest discovery run with a 3-second budget, so CI catches both global suite regressions and single-test outliers that meaningfully move total runtime.
@@ -63,7 +65,7 @@ Last updated: 2026-06-09
 1. Live-validate the updated two-way haul startup path and haul telemetry, especially station-2 starts, station-1 run finalization, and `Market.json` fallback behavior.
 2. Live-test the queued TTS callouts on macOS, including the new low supply/demand warning, and trim or reword noisy announcements based on operator feedback.
 3. Keep the full-suite timing guard in place and tune the threshold only after measuring stable CI variance across several runs and platforms; the current CI budget is `3s`.
-4. Re-run the Windows `diagnostics.py --send-test-key` path on a real machine and capture the new `WinError` detail if `SendInput` still fails.
+4. Expand Windows validation beyond the current community live check from CMDR VRYAE, including re-running `diagnostics.py --send-test-key` on additional real machines and capturing the new `WinError` detail if `SendInput` still fails.
 5. Continue the next portability follow-up slice: CV capture/performance measurement, journal latency measurement, and diagnostics/dashboard work from plans 0002-0004.
 6. Parked validation idea: add a small Python key-receiver app plus self-hosted desktop runners for end-to-end live input validation of raw keys, modifiers, and key-order semantics. Do not treat hosted CI alone as sufficient for that coverage.
 7. After the next live Control Room run, verify the new startup warning wording against the actual Odyssey Controls menu labels, especially for `FocusLeftPanel` and the galaxy-map `CamZoomIn` binding.
