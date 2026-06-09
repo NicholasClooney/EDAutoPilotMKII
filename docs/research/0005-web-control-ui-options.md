@@ -81,6 +81,32 @@ If we prototype with NiceGUI and want iPhone Safari support, plan on HTTPS rathe
 
 If we build a tiny custom frontend instead, plain HTTP plus WebSocket may still work for the current scope, but HTTPS remains the safer long-term default once mobile Safari is in the loop.
 
+## Follow-Up: Broader iOS / WebKit Caveats
+
+A second pass of research clarified which mobile pain points are framework-specific to NiceGUI versus universal WebKit/iOS behavior. This matters because the answer changes whether switching frameworks would actually fix anything.
+
+Universal WebKit/iOS behavior, hits any WebSocket-based web app:
+
+- Backgrounding the Safari tab kills the WebSocket connection. State-bearing pages re-initialize on return.
+- Locking the screen kills the WebSocket. After unlock, the JS side often still reports the socket as `open` while it is actually dead, with no `close` or `error` event fired. This is a documented WebKit behavior, not a NiceGUI bug.
+- Service Workers (and therefore any installable PWA) require HTTPS unconditionally. There is no plain-HTTP path to a real PWA install on iOS.
+
+NiceGUI-specific on top of the above:
+
+- Issue `#5802`: plain-HTTP LAN access reloads repeatedly on iOS Safari because the v3 handshake uses `crypto.randomUUID()`, which is a secure-context-only API.
+- Issue `#5468`: reports that NiceGUI apps can become unresponsive on iOS Safari after the first successful connection, with subsequent reconnect attempts failing until a manual refresh or cache clear.
+
+Sources:
+
+- <https://github.com/zauberzeug/nicegui/issues/5802>
+- <https://github.com/zauberzeug/nicegui/issues/5468>
+
+Practical takeaway:
+
+- Switching away from NiceGUI removes the repeated-reload bug and the post-reconnect unresponsiveness, but does not remove the universal iOS behaviors (background kill, screen-lock kill, fake-open socket).
+- Any stack we pick should assume the WebSocket will silently die on mobile and should be able to recover without user intervention beyond an occasional refresh.
+- HTTPS remains the safer default for any iPhone-in-the-loop scenario, even when not strictly required by the chosen stack.
+
 ## Deferred Implementation Shape
 
 Before any web UI is added, the likely minimum internal refactor is:
