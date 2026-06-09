@@ -15,6 +15,7 @@ Usage:
     uv run python3 tools/scratch/scratch_market.py --config config.toml --filter gold
     uv run python3 tools/scratch/scratch_market.py --config config.toml --raw
     uv run python3 tools/scratch/scratch_market.py --config config.toml --raw --sort sell
+    uv run python3 tools/scratch/scratch_market.py --config config.toml --format json --side sell
 """
 from __future__ import annotations
 
@@ -40,7 +41,47 @@ def _localised(item: dict, key: str) -> str:
     return item.get(f"{key}_Localised") or item.get(key, "")
 
 
-def _ingame_display(items: list[dict], filter_term: str | None) -> None:
+def _matches_term(item: dict, filter_term: str | None) -> bool:
+    if not filter_term:
+        return True
+    term = filter_term.lower()
+    name = _localised(item, "Name")
+    category = _localised(item, "Category")
+    return term in name.lower() or term in category.lower()
+
+
+def _matches_side(item: dict, side: str) -> bool:
+    if side == "all":
+        return True
+    if side == "buy":
+        return item.get("Stock", 0) > 0
+    return item.get("DemandBracket", 0) > 0
+
+
+def _filtered_items(items: list[dict], filter_term: str | None, side: str) -> list[dict]:
+    return [
+        item for item in items
+        if _matches_term(item, filter_term) and _matches_side(item, side)
+    ]
+
+
+def _ingame_rows(items: list[dict], filter_term: str | None, side: str) -> list[dict]:
+    rows = []
+    for item in _filtered_items(items, filter_term, side):
+        rows.append({
+            "name": _localised(item, "Name"),
+            "category": _localised(item, "Category"),
+            "buy_price": item.get("BuyPrice", 0),
+            "sell_price": item.get("SellPrice", 0),
+            "stock": item.get("Stock", 0),
+            "stock_bracket": item.get("StockBracket", 0),
+            "demand": item.get("Demand", 0),
+            "demand_bracket": item.get("DemandBracket", 0),
+        })
+    return sorted(rows, key=lambda row: (row["category"].lower(), row["name"].lower()))
+
+
+def _ingame_display(items: list[dict], filter_term: str | None, side: str) -> None:
     term = filter_term.lower() if filter_term else None
 
     buy_groups: dict[str, list[tuple[str, int, int]]] = {}
@@ -53,9 +94,9 @@ def _ingame_display(items: list[dict], filter_term: str | None) -> None:
             continue
         stock = item.get("Stock", 0)
         demand = item.get("Demand", 0)
-        if stock > 0:
+        if stock > 0 and side in {"all", "buy"}:
             buy_groups.setdefault(category, []).append((name, stock, item.get("BuyPrice", 0)))
-        if item.get("DemandBracket", 0) > 0:
+        if item.get("DemandBracket", 0) > 0 and side in {"all", "sell"}:
             sell_groups.setdefault(category, []).append((name, demand, item.get("SellPrice", 0)))
 
     all_names = [n for grp in (buy_groups, sell_groups) for it in grp.values() for n, _, _ in it]
@@ -83,14 +124,11 @@ def _ingame_display(items: list[dict], filter_term: str | None) -> None:
         print(f"{left:<{left_w}}  │  {right}")
 
 
-def _raw_display(items: list[dict], filter_term: str | None, sort: str | None) -> None:
-    term = filter_term.lower() if filter_term else None
+def _raw_display(items: list[dict], filter_term: str | None, sort: str | None, side: str) -> None:
     rows = []
-    for item in items:
+    for item in _filtered_items(items, filter_term, side):
         name = _localised(item, "Name")
         category = _localised(item, "Category")
-        if term and term not in name.lower() and term not in category.lower():
-            continue
         rows.append((
             name, category,
             item.get("BuyPrice", 0), item.get("SellPrice", 0),
@@ -132,11 +170,27 @@ def _raw_display(items: list[dict], filter_term: str | None, sort: str | None) -
     print(f"\n{len(rows)} item(s)")
 
 
+def _json_display(items: list[dict], filter_term: str | None, side: str) -> None:
+    print(json.dumps(_ingame_rows(items, filter_term, side), indent=2))
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Read and display Market.json from the ED journal directory")
     parser.add_argument("--config", default="config.toml")
     parser.add_argument("--filter", metavar="TERM", help="case-insensitive substring filter on name or category")
     parser.add_argument("--raw", action="store_true", help="flat table of all items instead of in-game layout")
+    parser.add_argument(
+        "--format",
+        choices=["text", "json"],
+        default="text",
+        help="output format (default: text)",
+    )
+    parser.add_argument(
+        "--side",
+        choices=["all", "buy", "sell"],
+        default="all",
+        help="filter rows to buy-visible, sell-visible, or all items",
+    )
     parser.add_argument(
         "--sort",
         choices=["alphabetical", "category", "buy", "sell", "stock", "demand"],
@@ -172,6 +226,10 @@ def main() -> None:
     ts = data.get("timestamp", "?")
     items: list[dict] = data.get("Items", [])
 
+    if args.format == "json":
+        _json_display(items, args.filter, args.side)
+        return
+
     print(f"Station:   {station}  ({system})")
     print(f"MarketID:  {market_id}")
     print(f"Timestamp: {ts}")
@@ -179,9 +237,9 @@ def main() -> None:
     print()
 
     if args.raw:
-        _raw_display(items, args.filter, args.sort)
+        _raw_display(items, args.filter, args.sort, args.side)
     else:
-        _ingame_display(items, args.filter)
+        _ingame_display(items, args.filter, args.side)
 
 
 if __name__ == "__main__":
