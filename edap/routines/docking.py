@@ -312,6 +312,8 @@ def dock(
             evt = request_event.get("event", "")
             station = request_event.get("StationName", "")
             progress_fn(f"{evt}: {station}" if station else str(evt))
+        if announce_fn is not None:
+            announce_fn(AnnouncementId.AUTO_DOCKING_ENGAGED)
         zero_dispatch = controls.set_speed_zero(repeat=2)
         break
 

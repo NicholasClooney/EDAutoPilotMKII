@@ -62,6 +62,10 @@ class LoadConfigTests(unittest.TestCase):
             self.assertEqual(config.tts.title, "commander")
             self.assertEqual(config.tts.phrases["destination_set"], "Setting destination to {system_name}.")
             self.assertEqual(
+                config.tts.phrases["auto_docking_engaged"],
+                "Engaging auto docking sequence.",
+            )
+            self.assertEqual(
                 config.tts.phrases["ship_serviced"],
                 "Ship is fully fueled up and repaired, {title}.",
             )

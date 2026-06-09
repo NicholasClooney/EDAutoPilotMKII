@@ -90,3 +90,24 @@ class TTSHelpersTests(unittest.TestCase):
         announcer.close()
 
         self.assertEqual(backend.spoken, ["Ship is fully fueled up and repaired, captain."])
+
+    def test_announcer_renders_auto_docking_phrase(self) -> None:
+        backend = _FakeBackend()
+        announcer = TTSAnnouncer(
+            TTSConfig(
+                enabled=True,
+                title="captain",
+                disabled_messages=(),
+                phrases={
+                    "auto_docking_engaged": "Engaging auto docking sequence.",
+                },
+            ),
+            platform_name="macos",
+            backend=backend,
+        )
+        self.addCleanup(announcer.close)
+
+        announcer.announce(AnnouncementId.AUTO_DOCKING_ENGAGED)
+        announcer.close()
+
+        self.assertEqual(backend.spoken, ["Engaging auto docking sequence."])

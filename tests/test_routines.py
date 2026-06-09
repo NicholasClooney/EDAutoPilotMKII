@@ -526,7 +526,48 @@ class RoutinesTests(unittest.TestCase):
         self.assertEqual(result.dispatch.status, "ok")
         self.assertEqual(
             announcements,
-            [(AnnouncementId.DOCKING_REQUEST, {"station_name": "Big Station"})],
+            [
+                (AnnouncementId.DOCKING_REQUEST, {"station_name": "Big Station"}),
+                (AnnouncementId.AUTO_DOCKING_ENGAGED, {}),
+            ],
+        )
+
+    def test_dock_announces_auto_docking_when_granted(self) -> None:
+        controls = FakeShipControls(
+            set_speed_zero_result=ActionDispatchResult(
+                action="SetSpeedZero",
+                status="ok",
+                binding=NormalizedBinding(key="x", modifier=None),
+            )
+        )
+        watcher = FakeWatcher(
+            [
+                [{"event": "SupercruiseExit", "BodyType": "Station"}],
+                [],
+                [{"event": "DockingGranted", "LandingPad": 40}],
+                [{"event": "Docked", "StationName": "Pawelczyk Dock"}],
+            ]
+        )
+        time_values = iter([0.0, 0.0, 0.0, 0.1, 0.1, 0.2])
+        announcements: list[tuple[object, dict[str, object]]] = []
+
+        result = dock(
+            controls,
+            watcher,
+            wait_for_supercruise_exit=True,
+            auto_refuel=False,
+            max_retries=1,
+            request_timeout_s=10.0,
+            dock_timeout_s=60.0,
+            time_fn=lambda: next(time_values),
+            sleeper=lambda _: None,
+            announce_fn=lambda message_id, **values: announcements.append((message_id, values)),
+        )
+
+        self.assertEqual(result.dispatch.status, "ok")
+        self.assertEqual(
+            announcements,
+            [(AnnouncementId.AUTO_DOCKING_ENGAGED, {})],
         )
 
     def test_dock_can_skip_supercruise_exit_and_chain_refuel_and_repair(self) -> None:
@@ -577,7 +618,13 @@ class RoutinesTests(unittest.TestCase):
                 {"action": "UI_Down", "repeat": 1, "hold_s": 0.0},
             ],
         )
-        self.assertEqual(announcements, [(AnnouncementId.SHIP_SERVICED, {})])
+        self.assertEqual(
+            announcements,
+            [
+                (AnnouncementId.AUTO_DOCKING_ENGAGED, {}),
+                (AnnouncementId.SHIP_SERVICED, {}),
+            ],
+        )
 
     def test_market_sell_spaces_back_presses_after_trade(self) -> None:
         controls = FakeShipControls(
