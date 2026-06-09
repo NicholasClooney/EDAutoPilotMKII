@@ -13,6 +13,7 @@ from control_room import (
     _cargo_summary_lines,
 )
 from edap.actions import ActionDispatchResult
+from edap.binding_lookup import build_binding_lookup
 from edap.config import (
     AppConfig,
     CaptureConfig,
@@ -1039,6 +1040,64 @@ class ControlRoomDispatchTests(unittest.TestCase):
         self.app._log_startup_modes()
 
         self.assertIn("Instant mode on — control with: instant", "\n".join(self.app.logged))
+
+    def test_log_bindings_status_reports_effective_bindings_file(self) -> None:
+        bindings_path = Path(self.tmpdir.name) / "Custom.binds"
+        resolved = ResolvedPath(
+            configured={"path": str(bindings_path), "status": "ok", "reason": "test bindings file"},
+            auto_detected={"path": str(bindings_path), "status": "ok", "reason": "test bindings file"},
+            effective={
+                "path": str(bindings_path),
+                "status": "ok",
+                "source": "configured",
+                "reason": "test bindings file",
+            },
+        )
+        self.app._ctx = RuntimeContext(
+            config=self.app._ctx.config,
+            game_paths=None,
+            journal=self.app._ctx.journal,
+            bindings=resolved,
+            input_controller=None,
+            screen_capture=None,
+            binding_lookup=build_binding_lookup(bindings={}, actions=[]),
+        )
+
+        self.app._log_bindings_status()
+
+        output = "\n".join(self.app.logged)
+        self.assertIn(f"Bindings file: {bindings_path}", output)
+        self.assertIn("source: configured", output)
+
+    def test_log_bindings_status_warns_about_missing_mappings(self) -> None:
+        bindings_path = Path(self.tmpdir.name) / "Custom.binds"
+        resolved = ResolvedPath(
+            configured={"path": str(bindings_path), "status": "ok", "reason": "test bindings file"},
+            auto_detected={"path": str(bindings_path), "status": "ok", "reason": "test bindings file"},
+            effective={
+                "path": str(bindings_path),
+                "status": "ok",
+                "source": "configured",
+                "reason": "test bindings file",
+            },
+        )
+        lookup = build_binding_lookup(bindings={}, actions=["UI_Back", "SetSpeedZero"])
+        self.app._ctx = RuntimeContext(
+            config=self.app._ctx.config,
+            game_paths=None,
+            journal=self.app._ctx.journal,
+            bindings=resolved,
+            input_controller=None,
+            screen_capture=None,
+            binding_lookup=lookup,
+        )
+
+        self.app._log_bindings_status()
+
+        output = "\n".join(self.app.logged)
+        self.assertIn("Bindings warning", output)
+        self.assertIn("UI_Back", output)
+        self.assertIn("SetSpeedZero", output)
 
     def test_market_filter_sets_filter_and_records_raw_value(self) -> None:
         self.app._dispatch_command("market filter Aluminium")

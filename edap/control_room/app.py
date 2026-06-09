@@ -467,6 +467,7 @@ class ControlRoomApp(App[None]):
         self.query_one("#haul", Static).border_title = "HAUL"
         self.query_one("#market", Static).border_title = "MARKET"
         self._build_controls()
+        self._log_bindings_status()
         self._load_saved_state()
         self._log_startup_modes()
         self._bootstrap_ship_state()
@@ -494,6 +495,37 @@ class ControlRoomApp(App[None]):
 
     def _load_saved_state(self) -> None:
         _persistence.load_saved_state(self)
+
+    def _log_bindings_status(self) -> None:
+        bindings_path = self._ctx.bindings.effective.get("path")
+        bindings_source = self._ctx.bindings.cli_source_status()
+        reason = self._ctx.bindings.effective.get("reason", "unknown")
+
+        if bindings_path:
+            self._log(
+                f"[dim]Bindings file: {escape(str(bindings_path))} "
+                f"(source: {escape(bindings_source)})[/]"
+            )
+        else:
+            self._log(
+                f"[yellow]Bindings file unavailable "
+                f"(source: {escape(bindings_source)}; reason: {escape(str(reason))})[/]"
+            )
+
+        if self._ctx.binding_lookup is None:
+            return
+
+        issues = self._ctx.binding_lookup.issues()
+        if not issues:
+            return
+
+        self._log(
+            f"[yellow]Bindings warning — {len(issues)} routine action(s) "
+            "have no usable keyboard mapping.[/]"
+        )
+        for action, result in sorted(issues.items()):
+            reason = result.reason or result.status
+            self._log(f"[yellow]- {escape(action)}: {escape(reason)}[/]")
 
     def _save_saved_state(self) -> None:
         _persistence.save_saved_state(self)
