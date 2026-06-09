@@ -31,6 +31,30 @@ class SpeakScriptTests(unittest.TestCase):
         build_backend.assert_called_once_with("linux")
         self.assertEqual(backend.spoken, ["hello there"])
 
+    def test_main_can_normalize_system_name_text(self) -> None:
+        backend = _FakeBackend()
+
+        with (
+            patch("speak.default_runtime_platform", return_value="linux"),
+            patch("speak.build_speech_backend", return_value=backend),
+        ):
+            result = speak.main(["--system-name", "HIP", "58412"])
+
+        self.assertEqual(result, 0)
+        self.assertEqual(backend.spoken, ["HIP 5 8 4 1 2"])
+
+    def test_main_can_normalize_station_name_text(self) -> None:
+        backend = _FakeBackend()
+
+        with (
+            patch("speak.default_runtime_platform", return_value="linux"),
+            patch("speak.build_speech_backend", return_value=backend),
+        ):
+            result = speak.main(["--station-name", "Pier", "2064"])
+
+        self.assertEqual(result, 0)
+        self.assertEqual(backend.spoken, ["Pier 2 0 6 4"])
+
     def test_main_returns_error_when_platform_detection_requires_explicit_config(self) -> None:
         with patch(
             "speak.default_runtime_platform",

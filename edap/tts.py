@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 from queue import Empty, Queue
+import re
 from shutil import which
 import subprocess
 from threading import Thread
@@ -51,6 +52,20 @@ def format_credits_short(value: int) -> str:
         prefix = "-" if value < 0 else ""
         return f"{prefix}{amount} thousand credits"
     return f"{value} credits"
+
+
+_DIGIT_RUN_RE = re.compile(r"\d{3,}")
+_SPOKEN_NAME_FIELDS = frozenset({"system_name", "station_name"})
+
+
+def _spell_digit_runs(text: str) -> str:
+    return _DIGIT_RUN_RE.sub(lambda match: " ".join(match.group(0)), text)
+
+
+def normalize_tts_value(field_name: str, value: object) -> object:
+    if field_name not in _SPOKEN_NAME_FIELDS or not isinstance(value, str):
+        return value
+    return _spell_digit_runs(value)
 
 
 class SpeechBackend(Protocol):
@@ -164,7 +179,11 @@ class TTSAnnouncer:
         template = self._phrases.get(message_id)
         if not template:
             return
-        rendered = template.format(title=self._resolve_title(), **values).strip()
+        normalized_values = {
+            key: normalize_tts_value(key, value)
+            for key, value in values.items()
+        }
+        rendered = template.format(title=self._resolve_title(), **normalized_values).strip()
         if not rendered or rendered == self._last_text:
             return
         self._last_text = rendered
