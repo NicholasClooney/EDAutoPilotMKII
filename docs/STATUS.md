@@ -13,6 +13,7 @@ Last updated: 2026-06-09
 - `control_room.py` is the primary operator surface. `run_routine.py`, `ship_controls.py`, `diagnostics.py`, `speak.py`, and the journal/bindings helpers remain the main manual-validation tools.
 - `bindings_files.py` now provides a quick operator utility to list `.binds` files from the detected bindings folder in newest-first order and copy one into the repo-local gitignored `backup/bindings/` folder.
 - Web-control UI research is now captured in `docs/research/0005-web-control-ui-options.md`, including the current NiceGUI-first prototype recommendation and the iPhone Safari LAN-HTTP caveat from NiceGUI issue `#5802`.
+- Elite preset-location research is now captured in `docs/research/0006-elite-bindings-preset-locations.md`, confirming that CrossOver user bindings live under `Options/Bindings` while Frontier's built-in presets come from the installed `ControlSchemes` folder, and that controller bindings are stored as logical `Device`/`Key` tokens backed by `DeviceMappings.xml`.
 
 ## Active Capabilities
 
