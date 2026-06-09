@@ -12,6 +12,7 @@ DEFAULT_TTS_CONFIG_PATH = Path(__file__).resolve().parent.parent / "defaults" / 
 
 VALID_PLATFORMS = {"linux", "macos", "windows"}
 VALID_CAPTURE_MODES = {"fullscreen", "region"}
+VALID_TTS_TITLE_MODES = {"commander", "custom", "commander_name"}
 
 
 def default_runtime_platform() -> str:
@@ -98,6 +99,7 @@ class ControlRoomConfig:
 @dataclass(frozen=True)
 class TTSConfig:
     enabled: bool = True
+    title_mode: str = "commander"
     title: str = "commander"
     disabled_messages: tuple[str, ...] = ()
     phrases: dict[str, str] = field(default_factory=dict)
@@ -299,8 +301,11 @@ def validate_config(config: AppConfig) -> AppConfig:
         raise ConfigError("Config value `control_room.command_delay_seconds` must be non-negative.")
     if config.control_room.status_refresh_seconds < 0:
         raise ConfigError("Config value `control_room.status_refresh_seconds` must be non-negative.")
-    if not config.tts.title.strip():
-        raise ConfigError("Config value `tts.title` cannot be empty.")
+    if config.tts.title_mode not in VALID_TTS_TITLE_MODES:
+        supported = ", ".join(sorted(VALID_TTS_TITLE_MODES))
+        raise ConfigError(f"Config value `tts.title_mode` must be one of: {supported}.")
+    if config.tts.title_mode == "custom" and not config.tts.title.strip():
+        raise ConfigError("Config value `tts.title` cannot be empty when `tts.title_mode` is `custom`.")
 
     _validate_path_shape(config.paths.journal_dir, key="paths.journal_dir", should_be_dir=True)
     _validate_path_shape(config.paths.bindings_file, key="paths.bindings_file", should_be_dir=False)
@@ -425,6 +430,7 @@ def load_config(path: Path | str = DEFAULT_CONFIG_PATH) -> AppConfig:
         ),
         tts=TTSConfig(
             enabled=_boolean(tts, "enabled", _boolean(default_tts, "enabled", True)),
+            title_mode=_string(tts, "title_mode", _string(default_tts, "title_mode", "commander")),
             title=_string(tts, "title", _string(default_tts, "title", "commander")),
             disabled_messages=(
                 _string_list(tts, "disabled_messages")

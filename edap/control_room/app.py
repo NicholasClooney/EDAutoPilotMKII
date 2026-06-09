@@ -668,6 +668,7 @@ class ControlRoomApp(App[None]):
 
     def _bootstrap_ship_state(self) -> None:
         _bootstrap.bootstrap_ship_state(self)
+        self._tts.set_commander_name(self._ship.commander)
 
     def _sync_status_snapshot(self) -> None:
         _bootstrap.sync_status_snapshot(self)
@@ -806,6 +807,7 @@ class ControlRoomApp(App[None]):
         event = ev.get("event", "")
         station_before = self._ship.station
         _events.apply_ship_event(self._ship, ev)
+        self._tts.set_commander_name(self._ship.commander)
         self._sync_status_snapshot()
 
         msg = self._activity_line(ev)

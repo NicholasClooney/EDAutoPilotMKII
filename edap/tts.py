@@ -147,11 +147,16 @@ class TTSAnnouncer:
             for raw, text in config.phrases.items()
             if (parsed := parse_announcement_id(raw)) is not None
         }
+        self._commander_name: str | None = None
         self._speaker: QueuedSpeaker | None = None
         self._last_text = ""
         selected_backend = backend if backend is not None else build_speech_backend(platform_name)
         if config.enabled and not isinstance(selected_backend, NullSpeechBackend):
             self._speaker = QueuedSpeaker(selected_backend)
+
+    def set_commander_name(self, name: str | None) -> None:
+        text = str(name).strip() if name is not None else ""
+        self._commander_name = text or None
 
     def announce(self, message_id: AnnouncementId, /, **values: object) -> None:
         if self._speaker is None or message_id in self._disabled:
@@ -159,11 +164,18 @@ class TTSAnnouncer:
         template = self._phrases.get(message_id)
         if not template:
             return
-        rendered = template.format(title=self._config.title, **values).strip()
+        rendered = template.format(title=self._resolve_title(), **values).strip()
         if not rendered or rendered == self._last_text:
             return
         self._last_text = rendered
         self._speaker.enqueue(rendered)
+
+    def _resolve_title(self) -> str:
+        if self._config.title_mode == "commander":
+            return "commander"
+        if self._config.title_mode == "commander_name":
+            return self._commander_name or "commander"
+        return self._config.title
 
     def close(self) -> None:
         if self._speaker is not None:

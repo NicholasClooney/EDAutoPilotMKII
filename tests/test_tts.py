@@ -24,6 +24,7 @@ class TTSHelpersTests(unittest.TestCase):
         announcer = TTSAnnouncer(
             TTSConfig(
                 enabled=True,
+                title_mode="custom",
                 title="captain",
                 disabled_messages=("arrival",),
                 phrases={
@@ -49,6 +50,7 @@ class TTSHelpersTests(unittest.TestCase):
         announcer = TTSAnnouncer(
             TTSConfig(
                 enabled=True,
+                title_mode="custom",
                 title="captain",
                 disabled_messages=(),
                 phrases={
@@ -75,6 +77,7 @@ class TTSHelpersTests(unittest.TestCase):
         announcer = TTSAnnouncer(
             TTSConfig(
                 enabled=True,
+                title_mode="custom",
                 title="captain",
                 disabled_messages=(),
                 phrases={
@@ -96,6 +99,7 @@ class TTSHelpersTests(unittest.TestCase):
         announcer = TTSAnnouncer(
             TTSConfig(
                 enabled=True,
+                title_mode="custom",
                 title="captain",
                 disabled_messages=(),
                 phrases={
@@ -111,3 +115,53 @@ class TTSHelpersTests(unittest.TestCase):
         announcer.close()
 
         self.assertEqual(backend.spoken, ["Engaging auto docking sequence."])
+
+    def test_announcer_uses_literal_commander_title_mode(self) -> None:
+        backend = _FakeBackend()
+        announcer = TTSAnnouncer(
+            TTSConfig(
+                enabled=True,
+                title_mode="commander",
+                title="captain",
+                disabled_messages=(),
+                phrases={
+                    "station_cleared": "Ready to jump, {title}.",
+                },
+            ),
+            platform_name="macos",
+            backend=backend,
+        )
+        self.addCleanup(announcer.close)
+
+        announcer.set_commander_name("VRYAE")
+        announcer.announce(AnnouncementId.STATION_CLEARED)
+        announcer.close()
+
+        self.assertEqual(backend.spoken, ["Ready to jump, commander."])
+
+    def test_announcer_uses_detected_commander_name_title_mode(self) -> None:
+        backend = _FakeBackend()
+        announcer = TTSAnnouncer(
+            TTSConfig(
+                enabled=True,
+                title_mode="commander_name",
+                title="captain",
+                disabled_messages=(),
+                phrases={
+                    "station_cleared": "Ready to jump, {title}.",
+                },
+            ),
+            platform_name="macos",
+            backend=backend,
+        )
+        self.addCleanup(announcer.close)
+
+        announcer.announce(AnnouncementId.STATION_CLEARED)
+        announcer.set_commander_name("VRYAE")
+        announcer.announce(AnnouncementId.STATION_CLEARED)
+        announcer.close()
+
+        self.assertEqual(
+            backend.spoken,
+            ["Ready to jump, commander.", "Ready to jump, VRYAE."],
+        )

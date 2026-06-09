@@ -91,7 +91,12 @@ status_refresh_seconds = 2.0
 
 [tts]
 enabled = true
+title_mode = "custom"
 title = "captain"
+# title_mode:
+#   "commander"      -> always uses the literal word "commander"
+#   "custom"         -> uses the `title` string above
+#   "commander_name" -> uses the detected CMDR name when available, else falls back to "commander"
 # List message IDs here to suppress them while still keeping their phrase text
 # available for future re-enabling or customization.
 disabled_messages = []

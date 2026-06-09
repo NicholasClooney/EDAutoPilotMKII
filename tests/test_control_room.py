@@ -219,9 +219,13 @@ class _HarnessActivityLog(ActivityLog):
 class _FakeTTS:
     def __init__(self) -> None:
         self.calls: list[tuple[AnnouncementId, dict[str, object]]] = []
+        self.commander_name: str | None = None
 
     def announce(self, message_id: AnnouncementId, **values: object) -> None:
         self.calls.append((message_id, values))
+
+    def set_commander_name(self, name: str | None) -> None:
+        self.commander_name = name
 
     def close(self) -> None:
         return None
@@ -389,6 +393,18 @@ class ControlRoomCommandTests(unittest.TestCase):
         self.assertEqual(self.app._ship.destination_name, "Dawes Hub")
         self.assertEqual(len(self.app._ship.cargo_inventory), 2)
 
+    def test_bootstrap_ship_state_syncs_commander_name_into_tts(self) -> None:
+        journal_dir = Path(self.tmpdir.name)
+        (journal_dir / "Journal.240101000000.01.log").write_text(
+            json.dumps({"event": "LoadGame", "Commander": "VRYAE"}) + "\n",
+            encoding="utf-8",
+        )
+        self.app._tts = _FakeTTS()
+
+        self.app._bootstrap_ship_state()
+
+        self.assertEqual(self.app._tts.commander_name, "VRYAE")
+
     def test_bootstrap_ship_state_reads_commander_from_commander_event(self) -> None:
         journal_dir = Path(self.tmpdir.name)
         (journal_dir / "Journal.240101000000.01.log").write_text(
@@ -534,6 +550,14 @@ class ControlRoomCommandTests(unittest.TestCase):
         self.app._load_market_json()
 
         self.assertFalse(self.app._ship.station)
+
+    def test_handle_event_syncs_commander_name_into_tts(self) -> None:
+        self.app._tts = _FakeTTS()
+
+        self.app._handle_event({"event": "Commander", "Name": "VRYAE"})
+
+        self.assertEqual(self.app._ship.commander, "VRYAE")
+        self.assertEqual(self.app._tts.commander_name, "VRYAE")
 
 
 class ControlRoomBindingsTests(unittest.TestCase):

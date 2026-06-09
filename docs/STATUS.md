@@ -31,6 +31,7 @@ Last updated: 2026-06-09
 - Market routines now log supply/demand levels, speak low-stock warnings, reset UI focus defensively, and support targeted sells even when the station is not actively buying the carried commodity.
 - `ActionDispatcher` is the single source of truth for repeated-input pacing; raw keys, repeated actions, and `submit_text` all emit separate paced taps there.
 - TTS phrases now live in `defaults/tts.toml` with user overrides under `[tts]`, and `speak.py` provides a minimal direct-backend smoke test.
+- TTS title handling now supports `tts.title_mode = "commander" | "custom" | "commander_name"`; `commander_name` uses the detected journal CMDR name once available and falls back to plain `commander` before that.
 - Windows input injection now builds the full Win32 `INPUT` union shape and surfaces native `GetLastError()` detail on `SendInput` failures.
 - CI runs the unittest suite cross-platform and enforces a 3-second full-suite ceiling; `tools/report_test_timing.py` can rank slow tests locally.
 

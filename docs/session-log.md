@@ -4,6 +4,7 @@ _This is the rolling short-form log for recent sessions. Keep entries concise an
 
 ## 2026-06-09
 
+- TTS title selection now supports literal `commander`, a custom configured string, or the detected commander name via `tts.title_mode`; Control Room keeps the announcer's commander-name context synced from bootstrap and live journal events. Verified with `uv run python3 -m unittest discover -s tests` (`328` tests, `0.162s`).
 - Shared journal snapshots now retain commander identity from `LoadGame`/`Commander`, and Control Room bootstrap seeds that field on startup so the operator name appears even when the UI attaches mid-session; verified with `uv run python3 -m unittest discover -s tests` (`321` tests, `0.146s`).
 - Control Room now appends every consumed journal event to repo-local `artifacts/control-room.log`, so live sessions have a durable event trace even when `watch_journal.py` is not running; verified with `uv run python3 -m unittest discover -s tests` (`315` tests, `0.136s`).
 - Documented Elite preset locations and controller-token format under CrossOver in `docs/research/0006-elite-bindings-preset-locations.md`: built-in presets come from the installed `Products/elite-dangerous-odyssey-64/ControlSchemes` folder, user-editable profiles still live under `AppData/Local/.../Options/Bindings`, and controller bindings are stored as symbolic `Device`/`Key` pairs with USB identity data in `DeviceMappings.xml`.

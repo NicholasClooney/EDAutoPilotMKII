@@ -59,6 +59,7 @@ class LoadConfigTests(unittest.TestCase):
             self.assertEqual(config.control_room.command_delay_seconds, 5.0)
             self.assertEqual(config.control_room.status_refresh_seconds, 2.0)
             self.assertTrue(config.tts.enabled)
+            self.assertEqual(config.tts.title_mode, "commander")
             self.assertEqual(config.tts.title, "commander")
             self.assertEqual(config.tts.phrases["destination_set"], "Setting destination to {system_name}.")
             self.assertEqual(
@@ -85,6 +86,7 @@ class LoadConfigTests(unittest.TestCase):
 [runtime]
 
 [tts]
+title_mode = "custom"
 title = "captain"
 disabled_messages = ["arrival"]
 
@@ -95,6 +97,7 @@ station_cleared = "Station cleared, {title}."
 
             config = load_config(config_path)
 
+            self.assertEqual(config.tts.title_mode, "custom")
             self.assertEqual(config.tts.title, "captain")
             self.assertEqual(config.tts.disabled_messages, ("arrival",))
             self.assertEqual(config.tts.phrases["station_cleared"], "Station cleared, {title}.")
@@ -125,6 +128,76 @@ station_cleared = "Station cleared, {title}."
                 config = load_config(config_path)
 
             self.assertEqual(config.runtime.platform, "windows")
+
+    def test_tts_commander_name_mode_allows_blank_custom_title(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "config.toml"
+            _write_config(
+                config_path,
+                """
+[paths]
+
+[controls]
+
+[screen]
+
+[runtime]
+
+[tts]
+title_mode = "commander_name"
+title = ""
+""".strip(),
+            )
+
+            config = load_config(config_path)
+
+            self.assertEqual(config.tts.title_mode, "commander_name")
+            self.assertEqual(config.tts.title, "")
+
+    def test_rejects_unknown_tts_title_mode(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "config.toml"
+            _write_config(
+                config_path,
+                """
+[paths]
+
+[controls]
+
+[screen]
+
+[runtime]
+
+[tts]
+title_mode = "invalid"
+""".strip(),
+            )
+
+            with self.assertRaisesRegex(ConfigError, "tts.title_mode"):
+                load_config(config_path)
+
+    def test_rejects_blank_custom_tts_title(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "config.toml"
+            _write_config(
+                config_path,
+                """
+[paths]
+
+[controls]
+
+[screen]
+
+[runtime]
+
+[tts]
+title_mode = "custom"
+title = ""
+""".strip(),
+            )
+
+            with self.assertRaisesRegex(ConfigError, "tts.title"):
+                load_config(config_path)
 
     def test_rejects_omitted_runtime_platform_on_unsupported_host(self) -> None:
         with TemporaryDirectory() as temp_dir:
