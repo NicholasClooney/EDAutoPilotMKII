@@ -54,6 +54,7 @@ Use [docs/session-log.md](docs/session-log.md) for concise rolling session notes
 - Treat macOS as the primary target until the diagnostic path is stable.
 - Preserve existing OpenCV/navigation behavior unless a change is required for portability.
 - Make incremental changes that are easy to validate.
+- If you add, remove, rename, or reorder top-level `README.md` sections, update the hand-written README table of contents in the same change. GitHub exposes an automatic Outline menu, but it does not replace the inline TOC block in the file.
 - When writing or updating tests, consider cross-platform behavior explicitly: avoid hardcoded path separators in expectations, and use TOML literal strings (`'...'`) for interpolated filesystem paths so Windows backslashes do not turn into invalid escapes.
 - If implementation reveals a new runtime or behavioral assumption, verify it with the user before baking it into defaults, heuristics, or policy-level behavior.
 

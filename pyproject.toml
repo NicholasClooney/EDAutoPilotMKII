@@ -1,6 +1,6 @@
 [project]
 name = "edautopilot"
-version = "1.7.0"
+version = "1.7.1"
 description = "Elite Dangerous autopilot experimentation"
 requires-python = ">=3.12"
 dependencies = [

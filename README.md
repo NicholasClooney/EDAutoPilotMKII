@@ -8,13 +8,48 @@ The current operator surface is [`control_room.py`](control_room.py). The projec
 
 See [docs/STATUS.md](docs/STATUS.md) for the maintained status, validation notes, and next recommended work.
 
+## Contents
+
+- [Start Here](#start-here)
+- [Control Room Highlights](#control-room-highlights)
+- [Haul Workflow](#haul-workflow)
+- [Current Surface](#current-surface)
+- [Primary Entrypoints](#primary-entrypoints)
+- [Platform Validation](#platform-validation)
+- [Galaxy Map Binding Requirement](#galaxy-map-binding-requirement)
+- [Bindings Utility](#bindings-utility)
+- [Repo Layout](#repo-layout)
+- [Docs Map](#docs-map)
+- [Development](#development)
+
 ## Start Here
 
+- run `uv sync`
 - run `uv run python3 control_room.py`
-- use `haul` as the main end-to-end workflow
-- start with [docs/getting-started/quickstart.md](docs/getting-started/quickstart.md)
+- use `haul` as the main end-to-end workflow once Control Room is open
+- for setup details, platform-specific notes, and more first commands, continue to [docs/getting-started/quickstart.md](docs/getting-started/quickstart.md)
 - use [docs/operators/control-room.md](docs/operators/control-room.md) for day-to-day operation
 - use [docs/operators/bindings-files.md](docs/operators/bindings-files.md) for `.binds` backup / restore / preset apply
+
+## Control Room Highlights
+
+- `control_room.py` is the primary operator surface
+- `haul` is the strongest current operator flow and runs the active two-way haul loop
+- `replay` / `Ctrl-R` reopens recent commands, including haul setups
+- one saved default haul setup persists across restarts
+- Control Room mirrors consumed journal events into `artifacts/control-room.log`
+
+Interrupt behavior during `haul` is haul-aware: the first `Ctrl-C` or `Ctrl-D` queues a stop after the current station-1 return sale and before the next buy. A second interrupt cancels immediately.
+
+## Haul Workflow
+
+`haul` is the strongest current end-to-end routine and the clearest example of what the active runtime is for. It automates a repeatable trade loop between two stations: resuming from the current game state, docking when needed, navigating station services, buying the target commodity, launching, plotting the return destination, and selling cargo at the other end.
+
+That makes it directly useful for high-volume A-to-B cargo work such as community goal hauling loops, where the repetitive station-to-station trading cycle is the part worth automating.
+
+Around that primary flow, the active routine surface also includes `dock`, `undock`, `jump`, `buy`, `sell`, and `dest`.
+
+These are built to be manually exercised against a live Elite session running through CrossOver, not left unattended.
 
 ## Current Surface
 
@@ -39,30 +74,11 @@ What is not done:
 - `uv run python3 bindings_files.py`
   Lists, backs up, restores, and can replace the active `.binds` file from shipped presets.
 
-## Control Room Highlights
-
-- `haul` is the strongest current operator flow and runs the active two-way haul loop
-- `replay` / `Ctrl-R` reopens recent commands, including haul setups
-- one saved default haul setup persists across restarts
-- Control Room mirrors consumed journal events into `artifacts/control-room.log`
-
-Interrupt behavior during `haul` is haul-aware: the first `Ctrl-C` or `Ctrl-D` queues a stop after the current station-1 return sale and before the next buy. A second interrupt cancels immediately.
-
 ## Platform Validation
 
 - macOS: live-validated with Elite running through CrossOver by myself, @NicholasClooney
 - Windows: live-validated by community member CMDR VRYAE
 - Linux: runtime paths exist, but no live validation yet
-
-## Routine Overview
-
-`haul` is the strongest current end-to-end routine and the clearest example of what the active runtime is for. It automates a repeatable trade loop between two stations: resuming from the current game state, docking when needed, navigating station services, buying the target commodity, launching, plotting the return destination, and selling cargo at the other end.
-
-That makes it directly useful for high-volume A-to-B cargo work such as the current community goal hauling loops, where the repetitive station-to-station trading cycle is the part worth automating.
-
-Around that primary flow, the active routine surface also includes `dock`, `undock`, `jump`, `buy`, `sell`, and `dest`.
-
-These are built to be manually exercised against a live Elite session running through CrossOver, not left unattended.
 
 ## Galaxy Map Binding Requirement
 
