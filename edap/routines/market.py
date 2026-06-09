@@ -245,6 +245,25 @@ def _find_market_item(items: list[dict], target: str, side: str) -> dict | None:
     return None
 
 
+def _read_buy_quantity_limit(
+    journal_dir: Path,
+    item: dict,
+) -> tuple[int | None, str]:
+    available_space = _read_available_cargo_space(journal_dir)
+    stock = item.get("Stock", 0)
+    stock_units = int(stock) if isinstance(stock, (int, float)) and not isinstance(stock, bool) else None
+    if stock_units is not None:
+        stock_units = max(0, stock_units)
+
+    if available_space is not None and stock_units is not None:
+        return min(available_space, stock_units), f"from min({available_space}t free, {stock_units}t supply)"
+    if available_space is not None:
+        return available_space, f"from {available_space}t free"
+    if stock_units is not None:
+        return stock_units, f"from {stock_units}t supply"
+    return None, "cargo space and station supply unavailable"
+
+
 def _report_market_level(
     item: dict,
     *,
@@ -703,18 +722,19 @@ def _market_trade_attempt(
     if side == "buy":
         if amount == "MAX":
             hold_s = max_hold_s
-            available_space = _read_available_cargo_space(market_path.parent)
-            if available_space is not None:
-                hold_s = min(max_hold_s, available_space * buy_hold_seconds_per_ton)
+            buy_limit, buy_limit_reason = _read_buy_quantity_limit(market_path.parent, item)
+            if buy_limit is not None:
+                hold_s = min(max_hold_s, buy_limit * buy_hold_seconds_per_ton)
             if progress_fn is not None:
-                if available_space is None:
+                if buy_limit is None:
                     progress_fn(
-                        f"  UI_Right hold {hold_s:.2f}s (fill to max; cargo space unavailable, using cap)"
+                        f"  UI_Right hold {hold_s:.2f}s "
+                        f"(fill to max; {buy_limit_reason}, using cap)"
                     )
                 else:
                     progress_fn(
                         f"  UI_Right hold {hold_s:.2f}s "
-                        f"(fill to max from {available_space}t free at {buy_hold_seconds_per_ton:.4f}s/t)"
+                        f"(fill to max {buy_limit_reason} at {buy_hold_seconds_per_ton:.4f}s/t)"
                     )
             qty_dispatch = controls.ui_right(hold_s=hold_s)
             if qty_dispatch.status != "ok":
