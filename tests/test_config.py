@@ -107,6 +107,45 @@ station_cleared = "Station cleared, {title}."
             )
             self.assertEqual(config.tts.phrases["destination_set"], "Setting destination to {system_name}.")
 
+    def test_loads_nested_control_section_overrides(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "config.toml"
+            _write_config(
+                config_path,
+                """
+[paths]
+
+[controls]
+start_hotkey = "pageup"
+
+[controls.hold]
+minimum_action_seconds = 0.15
+continuous_action_seconds = 0.25
+
+[controls.market]
+nav_delay_seconds = 0.2
+trade_max_attempts = 5
+
+[controls.haul.two_way]
+auto_hyperspace_engage = false
+nav_panel_open_delay_seconds = 4.0
+
+[screen]
+
+[runtime]
+""".strip(),
+            )
+
+            config = load_config(config_path)
+
+            self.assertEqual(config.controls.start_hotkey, "pageup")
+            self.assertEqual(config.controls.minimum_action_hold_seconds, 0.15)
+            self.assertEqual(config.controls.continuous_action_hold_seconds, 0.25)
+            self.assertEqual(config.controls.market_nav_delay_seconds, 0.2)
+            self.assertEqual(config.controls.market_trade_max_attempts, 5)
+            self.assertFalse(config.controls.haul_two_way_auto_hyperspace_engage)
+            self.assertEqual(config.controls.haul_two_way_nav_panel_open_delay_seconds, 4.0)
+
     def test_defaults_runtime_platform_from_host_when_omitted(self) -> None:
         with TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)

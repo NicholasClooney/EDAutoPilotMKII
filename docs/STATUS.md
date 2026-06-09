@@ -9,7 +9,7 @@ Last updated: 2026-06-09
 - Plan 0001 (macOS MVP portability) is complete. Shared runtime, config loading, journal parsing, bindings lookup, and synthetic input are in place and live-validated on macOS + CrossOver.
 - Windows now has early real-world validation from CMDR VRYAE, so the platform story is macOS-primary with initial Windows confirmation rather than macOS-only live validation.
 - Current work is follow-up, not a rewrite: journal-driven routines, two-way hauling, CV/capture validation, and operator diagnostics.
-- Stable release `v1.7.0` now packages the bindings backup/restore/apply-default utility, Control Room journal-event logging plus commander restore, deferred haul-stop behavior, and commander-aware TTS titles.
+- Stable release `v1.7.1` now packages the `v1.7.0` bindings utility plus Control Room/TTS/haul follow-up slice, including unified docked-location bootstrap across Control Room + haul, configured-title hyperspace-arrival TTS, and the tightened operator docs surface.
 - `control_room.py` is the primary operator surface. `run_routine.py`, `ship_controls.py`, `diagnostics.py`, `speak.py`, and the journal/bindings helpers remain the main manual-validation tools.
 - `bindings_files.py` now provides a quick operator utility to list `.binds` files from the detected bindings folder, copy them into the repo-local gitignored `backup/bindings/` folder, restore from numbered or interactive backup selections, and apply shipped default presets onto the active custom file after confirmation while saving a safety backup first.
 - Operator-facing usage for `bindings_files.py` now lives in `docs/operators/bindings-files.md`, and `README.md` now calls out that `apply-default` is implemented but not yet live-validated against a real Elite session.
@@ -35,6 +35,7 @@ Last updated: 2026-06-09
 - `ActionDispatcher` is the single source of truth for repeated-input pacing; raw keys, repeated actions, and `submit_text` all emit separate paced taps there.
 - TTS phrases now live in `defaults/tts.toml` with user overrides under `[tts]`, and `speak.py` provides a minimal direct-backend smoke test.
 - TTS title handling now supports `tts.title_mode = "commander" | "custom" | "commander_name"`; `commander_name` uses the detected journal CMDR name once available and falls back to plain `commander` before that.
+- The config loader now also accepts grouped control subtables such as `[controls.market]` and `[controls.haul.two_way]`, so `config.example.toml` can stay organized while local `config.toml` files only need the specific overrides a commander wants.
 - Windows input injection now builds the full Win32 `INPUT` union shape and surfaces native `GetLastError()` detail on `SendInput` failures.
 - CI runs the unittest suite cross-platform and enforces a 3-second full-suite ceiling; `tools/report_test_timing.py` can rank slow tests locally.
 

@@ -34,7 +34,8 @@ def main() -> int:
     except FileNotFoundError:
         sys.stderr.write(
             f"Config file not found: {args.config}\n"
-            f"Create `config.toml` from `config.example.toml`, or pass `--config /path/to/config.toml`.\n"
+            "Create a `config.toml` with the overrides you need, use `config.example.toml` as a reference, "
+            "or pass `--config /path/to/config.toml`.\n"
         )
         return 2
     except ConfigError as exc:

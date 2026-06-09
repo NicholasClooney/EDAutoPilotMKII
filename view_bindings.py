@@ -97,7 +97,8 @@ def _resolve_bindings_file(args: argparse.Namespace) -> Path | None:
     except FileNotFoundError:
         sys.stderr.write(
             f"Config file not found: {args.config}\n"
-            f"Create `config.toml` from `config.example.toml`, or pass `--config /path/to/config.toml`.\n"
+            "Create a `config.toml` with the overrides you need, use `config.example.toml` as a reference, "
+            "or pass `--config /path/to/config.toml`.\n"
         )
         return None
     except ConfigError as exc:

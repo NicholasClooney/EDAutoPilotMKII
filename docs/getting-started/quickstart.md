@@ -2,9 +2,11 @@
 
 ## Setup
 
+`config.example.toml` is the full reference config. Create a local `config.toml` only if you want overrides, and put only the keys you want to change in it.
+
 ### macOS + CrossOver
 
-1. Copy `config.example.toml` to `config.toml`.
+1. Create `config.toml` only if you need local overrides.
 2. Set `paths.journal_dir` and `paths.bindings_file` explicitly if auto-detection is not enough on this machine.
 3. Leave `runtime.platform` unset unless you want to make the backend choice explicit in a shared config. When omitted, it defaults to the host OS.
 4. Make sure Terminal has macOS Accessibility permission, and Screen Recording permission if you plan to use capture-based diagnostics.
@@ -14,7 +16,7 @@
 
 1. Install Python 3.12 and `uv`.
 2. Run `uv sync`.
-3. Copy `config.example.toml` to `config.toml`.
+3. Create `config.toml` only if you need local overrides.
 4. Leave `runtime.platform` unset unless you want to make the backend choice explicit in a shared config. When omitted, it defaults to the host OS.
 5. Set `paths.journal_dir` and `paths.bindings_file` explicitly.
 6. Start Elite Dangerous.
@@ -40,7 +42,7 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-5. Copy `config.example.toml` to `config.toml`.
+5. Create `config.toml` only if you need local overrides.
 6. Leave `runtime.platform` unset unless you want to make the backend choice explicit in a shared config. When omitted, it defaults to the host OS.
 7. Set `paths.journal_dir` and `paths.bindings_file` explicitly.
 8. Start Elite Dangerous.
@@ -49,10 +51,22 @@ pip install -r requirements.txt
 
 1. Install Python 3.12 and `uv`.
 2. Install `xdotool` if you want synthetic key input support.
-3. Copy `config.example.toml` to `config.toml`.
+3. Create `config.toml` only if you need local overrides.
 4. Leave `runtime.platform` unset unless you want to make the backend choice explicit in a shared config. When omitted, it defaults to the host OS.
 5. Prefer explicit `paths.journal_dir` and `paths.bindings_file`, though the runtime now also probes common Steam Proton paths for app ID `359320`.
 6. Start Elite Dangerous through Steam/Proton.
+
+Minimal example:
+
+```toml
+[paths]
+journal_dir = ""
+bindings_file = ""
+
+[tts]
+title_mode = "custom"
+title = "captain"
+```
 
 Linux input is currently implemented through `xdotool`, so treat it as X11-oriented and verify it locally before relying on routines. Wayland behavior is unverified.
 

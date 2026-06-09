@@ -150,29 +150,57 @@ def _optional_table(raw: dict[str, object], key: str) -> dict[str, object]:
     return value
 
 
-def _string(raw: dict[str, object], key: str, default: str) -> str:
-    value = raw.get(key, default)
+def _lookup_value(raw: dict[str, object], key: str, aliases: tuple[str, ...] = ()) -> object | None:
+    if key in raw:
+        return raw[key]
+    for alias in aliases:
+        if alias in raw:
+            return raw[alias]
+    return None
+
+
+def _flatten_table(raw: dict[str, object], *, prefix: str = "") -> dict[str, object]:
+    flattened: dict[str, object] = {}
+    for key, value in raw.items():
+        dotted_key = f"{prefix}.{key}" if prefix else key
+        if isinstance(value, dict):
+            flattened.update(_flatten_table(value, prefix=dotted_key))
+            continue
+        flattened[dotted_key] = value
+    return flattened
+
+
+def _string(raw: dict[str, object], key: str, default: str, *, aliases: tuple[str, ...] = ()) -> str:
+    value = _lookup_value(raw, key, aliases)
+    if value is None:
+        value = default
     if not isinstance(value, str):
         raise ConfigError(f"Config value `{key}` must be a string.")
     return value
 
 
-def _integer(raw: dict[str, object], key: str, default: int) -> int:
-    value = raw.get(key, default)
+def _integer(raw: dict[str, object], key: str, default: int, *, aliases: tuple[str, ...] = ()) -> int:
+    value = _lookup_value(raw, key, aliases)
+    if value is None:
+        value = default
     if isinstance(value, bool) or not isinstance(value, int):
         raise ConfigError(f"Config value `{key}` must be an integer.")
     return value
 
 
-def _float(raw: dict[str, object], key: str, default: float) -> float:
-    value = raw.get(key, default)
+def _float(raw: dict[str, object], key: str, default: float, *, aliases: tuple[str, ...] = ()) -> float:
+    value = _lookup_value(raw, key, aliases)
+    if value is None:
+        value = default
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise ConfigError(f"Config value `{key}` must be a number.")
     return float(value)
 
 
-def _boolean(raw: dict[str, object], key: str, default: bool) -> bool:
-    value = raw.get(key, default)
+def _boolean(raw: dict[str, object], key: str, default: bool, *, aliases: tuple[str, ...] = ()) -> bool:
+    value = _lookup_value(raw, key, aliases)
+    if value is None:
+        value = default
     if not isinstance(value, bool):
         raise ConfigError(f"Config value `{key}` must be true or false.")
     return value
@@ -335,6 +363,7 @@ def load_config(path: Path | str = DEFAULT_CONFIG_PATH) -> AppConfig:
 
     paths = _require_table(raw, "paths")
     controls = _require_table(raw, "controls")
+    controls_flat = _flatten_table(controls)
     screen = _require_table(raw, "screen")
     screen_capture = _optional_table(screen, "capture")
     screen_capture_regions = _optional_table(screen_capture, "regions")
@@ -371,37 +400,110 @@ def load_config(path: Path | str = DEFAULT_CONFIG_PATH) -> AppConfig:
             bindings_file=_optional_path(paths.get("bindings_file")),
         ),
         controls=ControlsConfig(
-            start_hotkey=_string(controls, "start_hotkey", "home"),
-            stop_hotkey=_string(controls, "stop_hotkey", "end"),
-            scanner_mode=_string(controls, "scanner_mode", "off"),
-            minimum_action_hold_seconds=_float(controls, "minimum_action_hold_seconds", 0.1),
-            continuous_action_hold_seconds=_float(controls, "continuous_action_hold_seconds", 0.2),
-            step_delay_seconds=_float(controls, "step_delay_seconds", 0.3),
-            galaxy_map_settle_seconds=_float(controls, "galaxy_map_settle_seconds", 2.0),
-            dock_supercruise_exit_settle_seconds=_float(controls, "dock_supercruise_exit_settle_seconds", 3.0),
-            haul_dock_timeout_seconds=_float(controls, "haul_dock_timeout_seconds", 600.0),
-            undock_timeout_seconds=_float(controls, "undock_timeout_seconds", 30.0),
-            undock_no_track_timeout_seconds=_float(controls, "undock_no_track_timeout_seconds", 600.0),
-            mass_lock_boost_delay_seconds=_float(controls, "mass_lock_boost_delay_seconds", 5.0),
-            market_nav_delay_seconds=_float(controls, "market_nav_delay_seconds", 0.1),
-            market_trade_max_attempts=_integer(controls, "market_trade_max_attempts", 3),
+            start_hotkey=_string(controls_flat, "start_hotkey", "home"),
+            stop_hotkey=_string(controls_flat, "stop_hotkey", "end"),
+            scanner_mode=_string(controls_flat, "scanner_mode", "off"),
+            minimum_action_hold_seconds=_float(
+                controls_flat,
+                "minimum_action_hold_seconds",
+                0.1,
+                aliases=("hold.minimum_action_seconds",),
+            ),
+            continuous_action_hold_seconds=_float(
+                controls_flat,
+                "continuous_action_hold_seconds",
+                0.2,
+                aliases=("hold.continuous_action_seconds",),
+            ),
+            step_delay_seconds=_float(
+                controls_flat,
+                "step_delay_seconds",
+                0.3,
+                aliases=("sequence.step_delay_seconds",),
+            ),
+            galaxy_map_settle_seconds=_float(
+                controls_flat,
+                "galaxy_map_settle_seconds",
+                2.0,
+                aliases=("galaxy_map.settle_seconds",),
+            ),
+            dock_supercruise_exit_settle_seconds=_float(
+                controls_flat,
+                "dock_supercruise_exit_settle_seconds",
+                3.0,
+                aliases=("dock.supercruise_exit_settle_seconds",),
+            ),
+            haul_dock_timeout_seconds=_float(
+                controls_flat,
+                "haul_dock_timeout_seconds",
+                600.0,
+                aliases=("haul.dock_timeout_seconds",),
+            ),
+            undock_timeout_seconds=_float(
+                controls_flat,
+                "undock_timeout_seconds",
+                30.0,
+                aliases=("undock.timeout_seconds",),
+            ),
+            undock_no_track_timeout_seconds=_float(
+                controls_flat,
+                "undock_no_track_timeout_seconds",
+                600.0,
+                aliases=("undock.no_track_timeout_seconds",),
+            ),
+            mass_lock_boost_delay_seconds=_float(
+                controls_flat,
+                "mass_lock_boost_delay_seconds",
+                5.0,
+                aliases=("mass_lock.boost_delay_seconds",),
+            ),
+            market_nav_delay_seconds=_float(
+                controls_flat,
+                "market_nav_delay_seconds",
+                0.1,
+                aliases=("market.nav_delay_seconds",),
+            ),
+            market_trade_max_attempts=_integer(
+                controls_flat,
+                "market_trade_max_attempts",
+                3,
+                aliases=("market.trade_max_attempts",),
+            ),
             market_buy_hold_seconds_per_ton=_float(
-                controls,
+                controls_flat,
                 "market_buy_hold_seconds_per_ton",
                 0.01,
+                aliases=("market.buy_hold_seconds_per_ton",),
             ),
-            market_critical_level_multiplier=_float(controls, "market_critical_level_multiplier", 10.0),
-            haul_post_sell_settle_seconds=_float(controls, "haul_post_sell_settle_seconds", 2.0),
-            haul_two_way_auto_hyperspace_engage=_boolean(controls, "haul_two_way_auto_hyperspace_engage", True),
+            market_critical_level_multiplier=_float(
+                controls_flat,
+                "market_critical_level_multiplier",
+                10.0,
+                aliases=("market.critical_level_multiplier",),
+            ),
+            haul_post_sell_settle_seconds=_float(
+                controls_flat,
+                "haul_post_sell_settle_seconds",
+                2.0,
+                aliases=("haul.post_sell_settle_seconds",),
+            ),
+            haul_two_way_auto_hyperspace_engage=_boolean(
+                controls_flat,
+                "haul_two_way_auto_hyperspace_engage",
+                True,
+                aliases=("haul.two_way.auto_hyperspace_engage",),
+            ),
             haul_two_way_open_nav_panel_after_hyperspace_arrival=_boolean(
-                controls,
+                controls_flat,
                 "haul_two_way_open_nav_panel_after_hyperspace_arrival",
                 True,
+                aliases=("haul.two_way.open_nav_panel_after_hyperspace_arrival",),
             ),
             haul_two_way_nav_panel_open_delay_seconds=_float(
-                controls,
+                controls_flat,
                 "haul_two_way_nav_panel_open_delay_seconds",
                 3.0,
+                aliases=("haul.two_way.nav_panel_open_delay_seconds",),
             ),
         ),
         screen=ScreenConfig(

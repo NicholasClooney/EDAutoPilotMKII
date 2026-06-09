@@ -3,78 +3,6 @@
 journal_dir = ""
 bindings_file = ""
 
-[controls]
-start_hotkey = "home"
-stop_hotkey = "end"
-scanner_mode = "off"
-# Minimum dwell for any synthetic key activation.
-minimum_action_hold_seconds = 0.1
-# Default dwell used for continuous controls like roll/pitch/yaw.
-continuous_action_hold_seconds = 0.2
-# Delay between individual key presses in any sequence.
-step_delay_seconds = 0.3
-# Shared settle delay for galaxy-map result loading and route plotting.
-galaxy_map_settle_seconds = 2.0
-# Delay after `SupercruiseExit` before the docking approach boost.
-dock_supercruise_exit_settle_seconds = 3.0
-# Default docking timeout for haul-loop station arrivals.
-haul_dock_timeout_seconds = 600.0
-# Default time to wait for the launch command to produce an Undocked event.
-undock_timeout_seconds = 30.0
-# Time to wait after Undocked for the music NoTrack event that confirms the ship has cleared the station.
-undock_no_track_timeout_seconds = 600.0
-# Default time to wait after Undocked for a stricter in-space confirmation event.
-undock_in_space_timeout_seconds = 180.0
-# Delay between each boost attempt while waiting for FSD mass lock to clear.
-mass_lock_boost_delay_seconds = 5.0
-# Delay after each UI_Down tap in buy/sell market navigation (covers both the item-list scroll and single down taps).
-market_nav_delay_seconds = 0.1
-# Maximum buy/sell attempts before aborting when the matching MarketBuy/MarketSell journal event is not observed.
-market_trade_max_attempts = 3
-# For `buy ... max`, hold UI_Right for `available cargo space * this factor`, capped by the routine max hold.
-market_buy_hold_seconds_per_ton = 0.01
-# Treat station supply/demand below this cargo-capacity multiplier as critically low for warning/TTS.
-market_critical_level_multiplier = 10.0
-# Settle pause after the two-way haul sell phase before the buy phase presses UI_Select.
-# The sell phase ends with UI_Back x2 back to the station services menu, and the buy phase
-# immediately presses UI_Select to re-enter it; without this pause the Select can land on
-# stale UI before the menu has redrawn. Set to 0 to disable.
-haul_post_sell_settle_seconds = 2.0
-# After two-way haul clears mass lock on departure, tap raw key "k" to engage hyperspace FSD.
-haul_two_way_auto_hyperspace_engage = true
-# After the hyperspace jump completes and the ship enters the destination system, open the left
-# external panel so the navigation page is ready before the station approach.
-haul_two_way_open_nav_panel_after_hyperspace_arrival = true
-# Delay after hyperspace arrival before opening the left external/nav panel.
-haul_two_way_nav_panel_open_delay_seconds = 3.0
-
-[screen]
-resolution_width = 1920
-resolution_height = 1080
-scale = 1.0
-capture_debug_path = "artifacts/diagnostics-screen.png"
-
-[screen.capture]
-# "fullscreen" keeps the current diagnostic behavior.
-# "region" captures only the configured base region below.
-mode = "fullscreen"
-left = 0.0
-top = 0.0
-right = 1.0
-bottom = 1.0
-
-[screen.capture.regions.center]
-left = 0.333333
-top = 0.333333
-right = 0.666667
-bottom = 0.666667
-
-[screen.capture.regions.compass]
-left = 0.3125
-top = 0.625
-right = 0.5
-bottom = 0.9375
-
 [runtime]
 # Optional override. When omitted, the runtime defaults to the host OS:
 # macOS -> "macos", Windows -> "windows".
@@ -105,3 +33,93 @@ disabled_messages = []
 # Override only the lines you want to change. Unspecified phrases still come
 # from defaults/tts.toml.
 # destination_set = "Setting destination to {system_name}."
+
+[controls]
+start_hotkey = "home"
+stop_hotkey = "end"
+scanner_mode = "off"
+
+[controls.hold]
+# Minimum dwell for any synthetic key activation.
+minimum_action_seconds = 0.1
+# Default dwell used for continuous controls like roll/pitch/yaw.
+continuous_action_seconds = 0.2
+
+[controls.sequence]
+# Delay between individual key presses in any sequence.
+step_delay_seconds = 0.3
+
+[controls.galaxy_map]
+# Shared settle delay for galaxy-map result loading and route plotting.
+settle_seconds = 2.0
+
+[controls.dock]
+# Delay after `SupercruiseExit` before the docking approach boost.
+supercruise_exit_settle_seconds = 3.0
+
+[controls.haul]
+# Default docking timeout for haul-loop station arrivals.
+dock_timeout_seconds = 600.0
+# Settle pause after the two-way haul sell phase before the buy phase presses UI_Select.
+# The sell phase ends with UI_Back x2 back to the station services menu, and the buy phase
+# immediately presses UI_Select to re-enter it; without this pause the Select can land on
+# stale UI before the menu has redrawn. Set to 0 to disable.
+post_sell_settle_seconds = 2.0
+
+[controls.haul.two_way]
+# After two-way haul clears mass lock on departure, tap raw key "k" to engage hyperspace FSD.
+auto_hyperspace_engage = true
+# After the hyperspace jump completes and the ship enters the destination system, open the left
+# external panel so the navigation page is ready before the station approach.
+open_nav_panel_after_hyperspace_arrival = true
+# Delay after hyperspace arrival before opening the left external/nav panel.
+nav_panel_open_delay_seconds = 3.0
+
+[controls.undock]
+# Default time to wait for the launch command to produce an Undocked event.
+timeout_seconds = 30.0
+# Time to wait after Undocked for the music NoTrack event that confirms the ship has cleared the station.
+no_track_timeout_seconds = 600.0
+# Default time to wait after Undocked for a stricter in-space confirmation event.
+in_space_timeout_seconds = 180.0
+
+[controls.mass_lock]
+# Delay between each boost attempt while waiting for FSD mass lock to clear.
+boost_delay_seconds = 5.0
+
+[controls.market]
+# Delay after each UI_Down tap in buy/sell market navigation (covers both the item-list scroll and single down taps).
+nav_delay_seconds = 0.1
+# Maximum buy/sell attempts before aborting when the matching MarketBuy/MarketSell journal event is not observed.
+trade_max_attempts = 3
+# For `buy ... max`, hold UI_Right for `available cargo space * this factor`, capped by the routine max hold.
+buy_hold_seconds_per_ton = 0.01
+# Treat station supply/demand below this cargo-capacity multiplier as critically low for warning/TTS.
+critical_level_multiplier = 10.0
+
+[screen]
+resolution_width = 1920
+resolution_height = 1080
+scale = 1.0
+capture_debug_path = "artifacts/diagnostics-screen.png"
+
+[screen.capture]
+# "fullscreen" keeps the current diagnostic behavior.
+# "region" captures only the configured base region below.
+mode = "fullscreen"
+left = 0.0
+top = 0.0
+right = 1.0
+bottom = 1.0
+
+[screen.capture.regions.center]
+left = 0.333333
+top = 0.333333
+right = 0.666667
+bottom = 0.666667
+
+[screen.capture.regions.compass]
+left = 0.3125
+top = 0.625
+right = 0.5
+bottom = 0.9375
