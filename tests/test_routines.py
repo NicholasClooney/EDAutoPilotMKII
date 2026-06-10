@@ -22,7 +22,7 @@ from edap.routines import (
     station_refuel_menu_sequence,
     undock as _undock,
 )
-from edap.routines._callbacks import noop_announce, noop_progress
+from edap.routines.callbacks import noop_announce, noop_progress
 from edap.tts import AnnouncementId
 from tests.fakes import FakeShipControls, FakeWatcher
 

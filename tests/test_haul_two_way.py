@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from edap.routines._callbacks import noop_announce, noop_progress
+from edap.routines.callbacks import noop_announce, noop_progress
 from edap.routines.haul_two_way import Phase, StationLeg, _detect_start_phase, haul_loop_two_way as _haul_loop_two_way
 from edap.routines._base import ActionDispatchResult, RoutineResult
 from edap.tts import AnnouncementId

@@ -12,7 +12,7 @@ from edap.routines._base import (
     SupportsPollEvents,
     _wait_for_event_with_pending,
 )
-from edap.routines._callbacks import AnnouncementCallback, ProgressCallback
+from edap.routines.callbacks import AnnouncementCallback, ProgressCallback
 from edap.tts import AnnouncementId
 
 

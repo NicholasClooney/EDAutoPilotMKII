@@ -4,7 +4,7 @@ from time import sleep
 from typing import Callable, Iterable
 
 from edap.routines._base import RoutineResult, SupportsSetSpeedZero
-from edap.routines._callbacks import ProgressCallback
+from edap.routines.callbacks import ProgressCallback
 
 
 def set_speed_zero_then_wait(

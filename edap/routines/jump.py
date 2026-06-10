@@ -12,7 +12,7 @@ from edap.routines._base import (
     _is_starting_hyperspace_event,
     _wait_for_event,
 )
-from edap.routines._callbacks import ProgressCallback
+from edap.routines.callbacks import ProgressCallback
 
 
 def jump(

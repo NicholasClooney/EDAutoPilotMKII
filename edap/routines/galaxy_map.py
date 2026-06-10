@@ -7,7 +7,7 @@ from typing import Callable
 
 from edap.actions import ActionDispatchResult
 from edap.routines._base import RoutineResult, SupportsGalaxyMapControls
-from edap.routines._callbacks import ProgressCallback
+from edap.routines.callbacks import ProgressCallback
 
 
 def _read_navroute_destination(journal_dir: Path) -> str | None:

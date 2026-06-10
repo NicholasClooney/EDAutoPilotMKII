@@ -6,7 +6,7 @@ from typing import Callable
 
 from edap.actions import ActionDispatchResult
 from edap.routines._base import RoutineResult, SupportsEscapeControls
-from edap.routines._callbacks import ProgressCallback
+from edap.routines.callbacks import ProgressCallback
 from edap.status import read_status
 
 
