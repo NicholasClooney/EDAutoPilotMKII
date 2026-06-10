@@ -12,7 +12,7 @@ uv run python3 diagnostics.py --send-test-key --test-key j --delay-seconds 5
 
 `diagnostics.py` validates config loading, journal path resolution, bindings parsing, screen capture, and synthetic input delivery.
 
-`--send-test-key` is a raw input-backend check. It sends the literal key you pass through the active platform backend and does not look up an Elite action from the `.binds` file. Use it to answer "can EDAP inject input at all on this machine?" not "does `SetSpeedZero` resolve and fire correctly?".
+`--send-test-key` is a raw input-backend check. It sends the literal key you pass through the active platform backend and does not look up an Elite action from the `.binds` file. Use it to answer "can EDControlRoom inject input at all on this machine?" not "does `SetSpeedZero` resolve and fire correctly?".
 
 ## Bindings
 

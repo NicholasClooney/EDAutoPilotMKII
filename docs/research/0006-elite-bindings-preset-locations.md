@@ -149,10 +149,10 @@ Observed token families include:
 - keyboard: `Key_W`, `Key_Space`
 - mouse: `Mouse_1`
 
-## Practical Implications For EDAP
+## Practical Implications For EDControlRoom
 
 - A tool that only scans `Options/Bindings/*.binds` will only see user-created profiles, not Frontier defaults.
-- If EDAP ever needs to inventory all selectable presets, it must optionally read both the writable `Options/Bindings` folder and the installed `ControlSchemes` folder.
+- If EDControlRoom ever needs to inventory all selectable presets, it must optionally read both the writable `Options/Bindings` folder and the installed `ControlSchemes` folder.
 - Any future controller/HOTAS introspection feature should treat `.binds` as symbolic mappings and use `DeviceMappings.xml` when it needs hardware identity context.
 - For operator backup/restore flows, the writable `Options/Bindings` folder remains the correct target because that is where edited custom profiles and `StartPreset*.start` live.
 

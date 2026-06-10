@@ -50,7 +50,7 @@ This does not prove broader autopilot behavior. It only proves the watcher-to-co
 
 Before running the manual test:
 
-1. If you keep a repo-root `config.toml`, make sure any overrides in it still point at the right journal directory and bindings file. If you do not have one, EDAP falls back to auto-detection.
+1. If you keep a repo-root `config.toml`, make sure any overrides in it still point at the right journal directory and bindings file. If you do not have one, EDControlRoom falls back to auto-detection.
 2. Ensure macOS Accessibility / input permissions are already working for the repo's existing diagnostics and manual control scripts.
 3. Ensure Elite Dangerous is running through CrossOver and can receive synthetic keyboard input on the current machine.
 
