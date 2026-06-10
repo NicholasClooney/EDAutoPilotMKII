@@ -26,11 +26,14 @@ See [docs/STATUS.md](docs/STATUS.md) for the maintained status, validation notes
 
 - run `uv sync`
 - run `uv run python3 control_room.py`
-- after you fire off a ship-affecting command, make sure to switch back to Elite Dangerous; EDAP works by sending keyboard input to the game window
-- those commands wait `5` seconds by default, so you have time to switch back to Elite before the first key press
-- if you are remotely connected to the shell and do not need that safety pause, use `instant` in Control Room to toggle the delay off or back on
-- use `haul` as the main end-to-end workflow once Control Room is open
-- for setup details, platform-specific notes, and more first commands, continue to [docs/getting-started/quickstart.md](docs/getting-started/quickstart.md)
+- Important Note:
+    - after you fire off a ship-affecting command, make sure to switch back to Elite Dangerous; EDAP works by sending keyboard input to the game window
+    - those commands wait `5` seconds by default, so you have time to switch back to Elite before the first key press
+    - if you are remotely connected to the shell and do not need that safety pause, use `instant` in Control Room to toggle the delay off or back on
+    
+Once you have control room up and running:
+- use `haul` to haul from A <-> B as the main end-to-end workflow
+- for setup details, platform-specific notes, and more commands, continue to [docs/getting-started/quickstart.md](docs/getting-started/quickstart.md)
 - use [docs/operators/control-room.md](docs/operators/control-room.md) for day-to-day operation
 - use [docs/operators/bindings-files.md](docs/operators/bindings-files.md) for `.binds` backup / restore / preset apply
 
