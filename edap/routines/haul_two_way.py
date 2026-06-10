@@ -14,7 +14,7 @@ from edap.routines._base import (
     SupportsPollEvents,
     _is_in_supercruise_event,
 )
-from edap.routines._callbacks import AnnouncementCallback, ProgressCallback
+from edap.routines.callbacks import AnnouncementCallback, ProgressCallback
 from edap.routines.docking import _undock_until_undocked, _wait_for_clear_of_station, dock, station_refuel_menu
 from edap.routines.escape import escape_mass_lock
 from edap.routines.galaxy_map import set_gal_map_destination

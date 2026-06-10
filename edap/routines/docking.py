@@ -17,7 +17,7 @@ from edap.routines._base import (
     _is_undocked_event,
     _wait_for_event_with_pending,
 )
-from edap.routines._callbacks import AnnouncementCallback, ProgressCallback
+from edap.routines.callbacks import AnnouncementCallback, ProgressCallback
 from edap.tts import AnnouncementId
 
 
