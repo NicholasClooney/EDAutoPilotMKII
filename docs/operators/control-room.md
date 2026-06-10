@@ -11,6 +11,8 @@ uv run python3 control_room.py --market aluminium
 
 If `config.toml` exists in the repo root, EDAP loads it automatically. Create one only when you need explicit overrides beyond the built-in auto-detection.
 
+![Control Room screenshot](../assets/control-room.png)
+
 ## What It Is
 
 - primary operator surface for current routine work
@@ -40,7 +42,7 @@ If `config.toml` exists in the repo root, EDAP loads it automatically. Create on
 - `haul [commodity]` runs the active two-way haul loop used by `run_routine.py --routine haul_loop`
 - haul resumes from current journal and sidecar state rather than assuming a fresh start
 - one default haul setup can be saved and reused across restarts
-- `replay` / `Ctrl-R` is the quickest way to relaunch recent haul commands
+- `replay` / `Ctrl-R` is the quickest way to relaunch recent haul commands or rerun a saved pattern without retyping it
 
 Interrupt behavior during `haul` is special:
 
@@ -59,16 +61,16 @@ Interrupt behavior during `haul` is special:
 - `help [command]`
 - `q`, `quit`, `exit`
 
-## Notes
+## Keybinds
 
-- Startup logs a current-version line in `ACTIVITY`; when the GitHub check confirms the local build is current it says `Currently running latest version (...)`, otherwise it falls back to `Currently running version ...`.
-- When `control_room.check_for_updates = true` (default), startup also performs a short GitHub latest-release check and adds a separate `A newer ED AutoPilot Mk II release is available: ...` line only when a newer release exists.
-- `control_room.activity_log_max_lines` controls how many lines the `ACTIVITY` pane retains in memory before discarding the oldest ones; default `2000`.
-- `control_room.status_refresh_seconds` controls how often control room re-reads `Status.json` and refreshes market/haul side state; default `2.0`.
-- Live observation on 2026-06-08: `Status.json` `Destination` does show in `SHIP STATUS` during supercruise, and also appears in normal space after dropping from supercruise, while docking, and while docked.
 - `Ctrl-R` opens replay/history from the command bar.
-- In replay/history, typing applies a simple prefix filter; `Backspace` deletes the filter.
-- `Ctrl-C` and `Ctrl-D` do not close the TUI while a routine is active; when idle they exit the app.
+- `Ctrl-C` stops the app when idle. During `haul`, the first press requests a safe stop at the next station-1 boundary after the return sale, and the second press cancels immediately.
+- `Ctrl-D` behaves the same as `Ctrl-C`.
+
+## Useful Behavior
+
+- Startup writes version information into `ACTIVITY`, and when update checks are enabled it also tells you if a newer ED AutoPilot Mk II release is available.
+- In replay/history, typing applies a simple prefix filter and `Backspace` removes characters from that filter.
 - `sell` with no explicit item falls back to `Cargo.json` if the in-memory cargo manifest is empty.
 - Cross-session command history and one saved default haul profile are persisted in `.control_room_state.json` by default.
-- Consumed journal events are mirrored into `artifacts/control-room.log`, with shutdown still flushing buffered writes before exit.
+- Consumed journal events are mirrored into `artifacts/control-room.log`, so you can inspect what Control Room saw during a run.
