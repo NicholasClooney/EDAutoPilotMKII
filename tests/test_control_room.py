@@ -109,9 +109,27 @@ class _FakeWorker:
         self.cancelled = True
 
 
+class _FakeVersionSource:
+    def __init__(
+        self,
+        *,
+        current_version: str = "9.9.9",
+        latest_release: GitHubRelease | None = None,
+    ) -> None:
+        self.current_version = current_version
+        self.latest_release = latest_release
+
+    def get_current_version(self) -> str:
+        return self.current_version
+
+    def fetch_latest_github_release(self) -> GitHubRelease | None:
+        return self.latest_release
+
+
 class _HarnessApp(ControlRoomApp):
     def __init__(self, ctx: RuntimeContext) -> None:
-        super().__init__(ctx)
+        self.version_source = _FakeVersionSource()
+        super().__init__(ctx, version_source=self.version_source)
         self._journal_artifact_log_path = ctx.config.control_room.state_file.parent / "control-room-artifact.log"
         self.logged: list[str] = []
         self.exit_calls = 0
@@ -158,7 +176,8 @@ class _WorkerGroupStub:
 
 class _ShutdownHarnessApp(ControlRoomApp):
     def __init__(self, ctx: RuntimeContext) -> None:
-        super().__init__(ctx)
+        self.version_source = _FakeVersionSource()
+        super().__init__(ctx, version_source=self.version_source)
         self._journal_artifact_log_path = ctx.config.control_room.state_file.parent / "control-room-artifact.log"
         self.exit_calls = 0
 
@@ -1360,7 +1379,7 @@ class ControlRoomDispatchTests(unittest.TestCase):
 
         mock_check.assert_not_called()
         self.assertIn(
-            "Currently running version *v1.7.2* of EDAutoPilotMKII",
+            "Currently running version *v9.9.9* of EDAutoPilotMKII",
             "\n".join(self.app.logged),
         )
 

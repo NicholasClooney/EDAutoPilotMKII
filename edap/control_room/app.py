@@ -39,7 +39,7 @@ import signal
 import sys
 import time
 from pathlib import Path
-from typing import IO, Any, Callable
+from typing import IO, Any, Callable, Protocol
 
 from rich.markup import escape
 from rich.text import Text
@@ -171,6 +171,20 @@ def _read_cargo_inventory(journal_dir: Path) -> list[dict[str, Any]]:
 
 def _cargo_summary_lines(inventory: list[dict[str, Any]], *, limit: int = 3) -> list[str]:
     return _rendering.cargo_summary_lines(inventory, limit=limit)
+
+
+class VersionSource(Protocol):
+    def get_current_version(self) -> str: ...
+
+    def fetch_latest_github_release(self) -> _version.GitHubRelease | None: ...
+
+
+class DefaultVersionSource:
+    def get_current_version(self) -> str:
+        return _version.get_current_version()
+
+    def fetch_latest_github_release(self) -> _version.GitHubRelease | None:
+        return _version.fetch_latest_github_release()
 
 
 class ActivityLog(RichLog):
@@ -333,7 +347,13 @@ class ControlRoomApp(App[None]):
     }
     """
 
-    def __init__(self, ctx: RuntimeContext, market_filter: str | None = None) -> None:
+    def __init__(
+        self,
+        ctx: RuntimeContext,
+        market_filter: str | None = None,
+        *,
+        version_source: VersionSource | None = None,
+    ) -> None:
         super().__init__()
         self._ctx = ctx
         self._config: AppConfig = ctx.config
@@ -357,7 +377,8 @@ class ControlRoomApp(App[None]):
         self._routine_worker: Any | None = None
         self._time_fn: Callable[[], float] = time.monotonic
         self._tts = TTSAnnouncer(self._config.tts, platform_name=self._config.runtime.platform)
-        self._current_version = _version.get_current_version()
+        self._version_source = version_source or DefaultVersionSource()
+        self._current_version = self._version_source.get_current_version()
         self._facade = _facade.ControlRoomFacade(
             self,
             default_placeholder=_DEFAULT_COMMAND_PLACEHOLDER,
@@ -861,7 +882,7 @@ class ControlRoomApp(App[None]):
 
     @work(thread=True, group="watchers", exclusive=False)
     def _check_for_updates(self) -> None:
-        release = _version.fetch_latest_github_release()
+        release = self._version_source.fetch_latest_github_release()
         if release is None:
             self.call_from_thread(self._log_current_version, is_latest=None)
             return
