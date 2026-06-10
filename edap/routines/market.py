@@ -34,7 +34,7 @@ def _is_sell_market_item(item: dict) -> bool:
     sell_price = int(item.get("SellPrice", 0) or 0)
     # Elite can let the player sell cargo the station is not actively buying.
     # In Market.json that often shows up as DemandBracket == 0 with a non-zero
-    # SellPrice. Treat those rows as intentionally sellable so EDAP can still
+    # SellPrice. Treat those rows as intentionally sellable so EDControlRoom can still
     # target and offload the player's existing cargo there.
     #
     # Keep excluding placeholder rows that have neither demand nor a sell price.

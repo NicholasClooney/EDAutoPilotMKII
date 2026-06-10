@@ -2,12 +2,13 @@
 
 _This is the startup handoff document for the repo. Keep it current, compact, and biased toward what the next session needs immediately. Hard limit: 80 lines. If an update would push this file past the limit, move displaced older status/session detail to `docs/status-archive.md` or a more specific doc, then trim this file back down._
 
-Last updated: 2026-06-10 (session 119)
+Last updated: 2026-06-10 (session 120)
 
 ## Current Snapshot
 
+- Active docs and small user-facing CLI text now consistently say `EDControlRoom` instead of older shorthand where the project is being presented to operators.
 - Active docs now use `EDControlRoom` branding for the current project name; old product-name references were removed from the maintained handoff/operator docs.
-- Haul docs now describe the commander-facing value explicitly: after the drop near station, EDAP handles docking request, station services, cargo trade, refuel/repair, routing, departure, mass-lock clearance, and FSD priming before handing jump alignment back to the commander via TTS.
+- Haul docs now describe the commander-facing value explicitly: after the drop near station, EDControlRoom handles docking request, station services, cargo trade, refuel/repair, routing, departure, mass-lock clearance, and FSD priming before handing jump alignment back to the commander via TTS.
 - Routine callback policy now lives in `AGENTS.md` under Working Rules: production routine APIs require explicit progress/announcement callbacks, shared no-op helpers in `edap/routines/callbacks.py` are test-only.
 - Plan 0001 (macOS MVP portability) is complete. Shared runtime, config loading, journal parsing, bindings lookup, and synthetic input are in place and live-validated on macOS + CrossOver.
 - Windows now has early real-world validation from CMDR VRYAE, so the platform story is macOS-primary with initial Windows confirmation rather than macOS-only live validation.

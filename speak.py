@@ -8,7 +8,7 @@ from edap.tts import NullSpeechBackend, build_speech_backend, normalize_tts_valu
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Speak a short message through EDAP TTS")
+    parser = argparse.ArgumentParser(description="Speak a short message through EDControlRoom TTS")
     name_group = parser.add_mutually_exclusive_group()
     name_group.add_argument(
         "--system-name",

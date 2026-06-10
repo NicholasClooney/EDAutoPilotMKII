@@ -47,7 +47,7 @@ Non-keyboard slots do not override a keyboard slot. Practical effect:
 
 - keyboard `Primary` + joystick/mouse `Secondary` => runtime keeps the keyboard `Primary`
 - joystick/mouse `Primary` + keyboard `Secondary` => runtime uses the keyboard `Secondary`
-- joystick/mouse only, with no keyboard bind in either slot => runtime reports the action missing, because EDAP can only emulate keyboard input today
+- joystick/mouse only, with no keyboard bind in either slot => runtime reports the action missing, because EDControlRoom can only emulate keyboard input today
 
 This is not just display detail. It changes what `control_room.py`, `run_routine.py`, and `ship_controls.py` will actually press.
 
@@ -62,7 +62,7 @@ This behavior matters in the galaxy map on the current Elite setup:
 - arrow-key `UI_*` bindings move the map/menu cursor/focus
 
 So adding arrow-key secondaries to `UI_Up`, `UI_Down`, `UI_Left`, `UI_Right`
-causes EDAP runtime navigation to use arrows instead of `W/A/S/D`, which is
+causes EDControlRoom runtime navigation to use arrows instead of `W/A/S/D`, which is
 currently what makes the galaxy-map menu/navigation flow work.
 
 ## Key Token Examples

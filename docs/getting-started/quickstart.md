@@ -2,7 +2,7 @@
 
 ## Setup
 
-`config.example.toml` is the full reference config. Create a local `config.toml` only if you want overrides; EDAP auto-loads it when present, and otherwise falls back to platform defaults plus auto-detection.
+`config.example.toml` is the full reference config. Create a local `config.toml` only if you want overrides; EDControlRoom auto-loads it when present, and otherwise falls back to platform defaults plus auto-detection.
 
 When you do create `config.toml`, keep it minimal:
 
