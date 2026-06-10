@@ -14,3 +14,4 @@ _This is the rolling short-form log for recent sessions. Keep entries concise an
 
 - Control Room startup now logs the current app version in `ACTIVITY` and can perform a short GitHub latest-release check to gently notify operators only when a newer release exists; added `control_room.check_for_updates = true|false` plus reusable `edap.version` helpers. Verified with `uv run python3 -m unittest discover -s tests` (`343` tests, `0.153s`).
 - Refined the startup wording so the version line says `Currently running latest version (...)` only when GitHub confirms the local release is current, otherwise it says `Currently running version ...` and adds a separate `A newer ED AutoPilot Mk II release is available: ...` line. Verified with `uv run python3 -m unittest discover -s tests` (`344` tests, `0.141s`).
+- Prepared release `v1.7.2`: bumped project version metadata and rolled the Control Room startup version/update notices into the maintained stable-release handoff.

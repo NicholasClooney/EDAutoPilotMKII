@@ -1360,7 +1360,7 @@ class ControlRoomDispatchTests(unittest.TestCase):
 
         mock_check.assert_not_called()
         self.assertIn(
-            "Currently running version *v1.7.1* of EDAutoPilotMKII",
+            "Currently running version *v1.7.2* of EDAutoPilotMKII",
             "\n".join(self.app.logged),
         )
 
